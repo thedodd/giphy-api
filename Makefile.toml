@@ -1,0 +1,34 @@
+# TODO:
+# - add notes on: `cargo make --no-workspace ...` to make this work intuitively.
+# - ensure wasm32-unknown-unknown is installed.
+
+[tasks.client-build]
+command = "cargo"
+args = ["build", "-p", "client", "--release", "--target", "wasm32-unknown-unknown"]
+
+[tasks.client-bindgen]
+install_crate = { crate_name="wasm-bindgen-cli", binary="wasm-bindgen", test_arg="--help" }
+command = "wasm-bindgen"
+args = ["target/wasm32-unknown-unknown/release/client.wasm", "--no-modules", "--out-dir", "./static"]
+
+[tasks.client-static]
+script_runner = "@shell"
+script = ['''
+cp ./client/index.html ./static
+''']
+
+[tasks.server-build]
+command = "cargo"
+args = ["build", "-p", "server", "--release"]
+
+[tasks.app-build]
+dependencies = [
+    "client-build",
+    "client-bindgen",
+    "client-static",
+    "server-build",
+]
+
+[tasks.watch]
+dependencies = ["app-build"]
+watch = { postpone=true, ignore_pattern="static" }

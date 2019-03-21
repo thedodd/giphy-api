@@ -1,0 +1,78 @@
+syntax = "proto3";
+package api;
+
+//////////////////////////////////////////////////////////////////////////////////////////////////
+/// Components ///////////////////////////////////////////////////////////////////////////////////
+
+// A user friendly description of an error which has taken place on the server.
+message Error {
+  // A user friendly message describing the error.
+  string description = 1;
+
+  // The HTTP status which classifies this type of error.
+  uint32 status = 2;
+
+  // An internal code used to drive client behavior.
+  string code = 3;
+
+  // Additional metadata on the error.
+  map<string,string> meta = 4;
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////////////
+/// Request & Response Variants //////////////////////////////////////////////////////////////////
+///
+/// Message types here come in pairs. If a Request is sent with a particular request variant, its
+/// corresponding Response variant will be returned. This invariant is part of the API's contract.
+
+// A login request.
+message LoginRequest {
+  string username = 1;
+  string password = 2;
+}
+
+// The response to a login request.
+message LoginResponse {
+  Error error = 1;
+  string jwt = 2;
+}
+
+// A request to refresh the given JWT.
+message RefreshTokenRequest {
+  string jwt = 3;
+}
+
+// The response to a refresh token request.
+message RefreshTokenResponse {
+  Error error = 1;
+  string jwt = 2;
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////////////
+/// Root Frame ///////////////////////////////////////////////////////////////////////////////////
+///
+/// The contract of this API is that any message sent to this API must be a RequestFrame.
+/// Similarly, the API will only ever send ResponseFrames over a connected websocket.
+
+// A data frame which represents an API request.
+message RequestFrame {
+  // The ID of this request.
+  //
+  // Clients must ensure that this ID is unique, as it is the primary mechanism used for matching
+  // request frames with response frames over a websocket.
+  string id = 1;
+  oneof request {
+    LoginRequest login = 10;
+    RefreshTokenRequest refresh_token = 11;
+  }
+}
+
+// A data frame which represents an API response.
+message ResponseFrame {
+  // The ID of the original request which produced this frame.
+  string id = 1;
+  oneof response {
+    LoginResponse login = 10;
+    RefreshTokenResponse refresh_token = 11;
+  }
+}
