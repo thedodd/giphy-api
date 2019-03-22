@@ -1,4 +1,5 @@
 mod handlers;
+mod proto;
 mod sockets;
 
 use std::path::Path;

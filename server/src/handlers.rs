@@ -1,10 +1,15 @@
 use actix::prelude::*;
 use log::info;
+use prost::Message as ProtoMessage;
+
+use crate::proto::api::{
+    RequestFrame, ResponseFrame, LoginResponse,
+};
 
 /// A request frame which has come in from a connected socket.
-pub struct RequestFrame(pub Vec<u8>);
+pub struct Request(pub Vec<u8>);
 
-impl Message for RequestFrame {
+impl Message for Request {
     type Result = Vec<u8>;
 }
 
@@ -19,11 +24,17 @@ impl Actor for SocketHandler {
 }
 
 /// Handle binary websocket frames.
-impl Handler<RequestFrame> for SocketHandler {
-    type Result = MessageResult<RequestFrame>;
+impl Handler<Request> for SocketHandler {
+    type Result = MessageResult<Request>;
 
-    fn handle(&mut self, _msg: RequestFrame, _: &mut Context<Self>) -> Self::Result {
+    fn handle(&mut self, msg: Request, _: &mut Context<Self>) -> Self::Result {
         info!("Handling client request in SocketHandler.");
-        MessageResult(Vec::with_capacity(0))
+        let frame = RequestFrame::decode(msg.0).expect("Expected to be able to decode received frame.");
+        info!("Message received: {:?}", &frame);
+
+        let mut buf = vec![];
+        let res = ResponseFrame::login(frame.id.clone(), LoginResponse{error: None, jwt: frame.id});
+        res.encode(&mut buf).unwrap(); // This will never fail.
+        MessageResult(buf)
     }
 }

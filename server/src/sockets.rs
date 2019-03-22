@@ -5,7 +5,7 @@ use actix_web::ws;
 use log::{debug};
 
 use crate::{
-    handlers::{RequestFrame, SocketHandler},
+    handlers::{Request, SocketHandler},
     AppState,
 };
 
@@ -50,7 +50,7 @@ impl StreamHandler<ws::Message, ws::ProtocolError> for SocketState {
             }
             ws::Message::Binary(mut frame) => self
                 .handler
-                .send(RequestFrame(frame.take().to_vec()))
+                .send(Request(frame.take().to_vec()))
                 .into_actor(self)
                 .then(|res, _actor, ctx| {
                     match res {

@@ -1,7 +1,9 @@
 use seed::prelude::*;
 
 use crate::{
-    json,
+    proto::api::{
+        RequestFrame, ResponseFrame,
+    },
 };
 
 /// The root data model of this application.
@@ -18,8 +20,8 @@ pub struct Model {
 #[derive(Clone)]
 pub enum ModelEvent {
     Connected,
-    ServerMsg(json::ServerMsg),
-    Send(json::ClientMsg),
+    ServerMsg(ResponseFrame),
+    Send(RequestFrame),
     Sent,
     EditChange(String),
 }
@@ -34,7 +36,7 @@ pub fn update(msg: ModelEvent, mut model: &mut Model) -> Update<ModelEvent> {
         ModelEvent::ServerMsg(msg) => {
             model.connected = true;
             model.msg_rx_cnt += 1;
-            model.messages.push(msg.text);
+            model.messages.push(msg.id);
             Render.into()
         }
         ModelEvent::EditChange(input_text) => {

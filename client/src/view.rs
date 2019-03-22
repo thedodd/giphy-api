@@ -1,7 +1,7 @@
 use seed::prelude::*;
 
 use crate::{
-    json,
+    proto::api::{LoginRequest, RequestFrame},
     state::{Model, ModelEvent},
 };
 
@@ -23,11 +23,12 @@ pub fn view(model: &Model) -> El<ModelEvent> {
                     attrs! {"type"=>"button";"id"=>"send"},
                     simple_ev(
                         "click",
-                        ModelEvent::Send(json::ClientMsg {
-                            text: model.input_text.clone()
-                        })
+                        ModelEvent::Send(RequestFrame::login(LoginRequest{
+                            username: model.input_text.clone(),
+                            password: model.input_text.clone(),
+                        }))
                     ),
-                    "Send"
+                    "Login"
                 ]
             ]
         } else {
