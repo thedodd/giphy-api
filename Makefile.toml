@@ -43,7 +43,7 @@ workspace = false
 command = "cargo"
 args = ["watch", "-w", "client", "-i", "client/src/proto/*", "-s", "cargo make client-flow"]
 
-[tasks.watch-server]
+[tasks.watch-server-run]
 workspace = false
 command = "cargo"
-args = ["watch", "-w", "server", "-i", "server/src/proto/*", "-s", "cargo build -p server --release"]
+args = ["watch", "-w", "server", "-i", "server/src/proto/*", "-s", "cargo run -p server --release"]

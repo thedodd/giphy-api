@@ -1,5 +1,6 @@
+use js_sys::{ArrayBuffer, Function, Uint8Array};
 use prost::Message;
-use seed::{prelude::*, App};
+use seed::prelude::*;
 use wasm_bindgen::{JsValue, JsCast};
 use web_sys::{
     console::{log_1, log_2},
@@ -7,13 +8,14 @@ use web_sys::{
 };
 
 use crate::{
-    proto::api::{LoginRequest, RequestFrame},
-    state::{Model, ModelEvent},
+    AppState,
+    proto::api::{LoginRequest, RequestFrame, ResponseFrame},
+    state::{ModelEvent},
 };
 
 const WS_URL: &str = "ws://127.0.0.1:8080/ws/";
 
-pub fn open_ws(state: App<ModelEvent, Model>) {
+pub fn open_ws(state: AppState) {
     let ws = WebSocket::new(WS_URL).unwrap();
     ws.set_binary_type(BinaryType::Arraybuffer);
 
@@ -27,16 +29,12 @@ pub fn open_ws(state: App<ModelEvent, Model>) {
         log!("WebSocket connection was closed");
     }) as Box<FnMut(JsValue)>);
 
-    let s = state.clone();
-    let on_message = Closure::wrap(Box::new(move |ev: MessageEvent| {
-        log_1(&"Client received a message".into());
-        log_2(&"Event type:".into(), &ev.type_().into());
-        // let txt = ev.data().as_string().unwrap();
-        // let json: json::ServerMsg = serde_json::from_str(&txt).unwrap();
-        // log_2(&"text message:".into(), &txt.into());
-        // s.update(ModelEvent::ServerMsg(json));
-    }) as Box<FnMut(MessageEvent)>);
+    // Build message handler.
+    let on_message = build_message_handler(state.clone());
+    ws.set_onmessage(Some(on_message.as_ref().unchecked_ref()));
+    on_message.forget();
 
+    // Build error handler.
     let on_error = Closure::wrap(Box::new(|_| {
         log_1(&"err".into());
     }) as Box<FnMut(JsValue)>);
@@ -45,10 +43,11 @@ pub fn open_ws(state: App<ModelEvent, Model>) {
     on_open.forget();
     ws.set_onclose(Some(on_close.as_ref().unchecked_ref()));
     on_close.forget();
-    ws.set_onmessage(Some(on_message.as_ref().unchecked_ref()));
-    on_message.forget();
     ws.set_onerror(Some(on_error.as_ref().unchecked_ref()));
     on_error.forget();
+
+    // Register a handler for sending messages to server on specific types of state changes.
+    // TODO: use a different pattern for this.
     let app = state.clone();
     state.add_message_listener(move |msg| match msg {
         ModelEvent::Send(msg) => {
@@ -67,4 +66,37 @@ pub fn open_ws(state: App<ModelEvent, Model>) {
         }
         _ => {}
     });
+}
+
+/// The handler function used for websocket connections.
+fn build_message_handler(state: AppState) -> Closure<(dyn FnMut(MessageEvent) + 'static)> {
+    let handler = move |ev: MessageEvent| {
+        // Extract the raw bytes of the message.
+        let buf = match ev.data().dyn_into::<ArrayBuffer>() {
+            Ok(buf) => {
+                let u8buf = Uint8Array::new(&buf);
+                let mut decode_buf = vec![0; u8buf.byte_length() as usize];
+                u8buf.copy_to(&mut decode_buf);
+                decode_buf
+            }
+            Err(_) => {
+                log!("Received an unexpected message from the server which was not a raw byte array.");
+                return;
+            }
+        };
+
+        // Decode the received message to our expected protobuf message type.
+        let frame = match ResponseFrame::decode(buf) {
+            Ok(frame) => frame,
+            Err(err) => {
+                log!(format!("Failed to decode server message: {:?}", err));
+                return;
+            }
+        };
+
+        // Process the recived message in our state update system.
+        log!(format!("Decoded message: {:?}", &frame));
+        state.update(ModelEvent::ServerMsg(frame));
+    };
+    Closure::wrap(Box::new(handler) as Box<FnMut(MessageEvent)>)
 }
