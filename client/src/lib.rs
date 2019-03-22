@@ -4,6 +4,7 @@
 extern crate seed;
 
 mod json;
+mod proto;
 
 use seed::{prelude::*, App};
 use wasm_bindgen::JsCast;

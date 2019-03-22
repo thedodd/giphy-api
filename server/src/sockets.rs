@@ -2,7 +2,7 @@ use std::time::{Duration, Instant};
 
 use actix::prelude::*;
 use actix_web::ws;
-use log::{debug, info};
+use log::{debug};
 
 use crate::{
     handlers::{RequestFrame, SocketHandler},
