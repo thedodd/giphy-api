@@ -32,3 +32,7 @@ dependencies = [
 [tasks.watch]
 dependencies = ["app-build"]
 watch = { postpone=true, ignore_pattern="static" }
+
+[tasks.watch-client]
+dependencies = ["client-build", "client-bindgen", "client-static"]
+watch = { postpone=true, ignore_pattern="static" }

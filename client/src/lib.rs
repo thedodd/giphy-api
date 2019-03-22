@@ -1,10 +1,10 @@
-//! A simple example demonstrating the usage of seed with WebSockets.
-
 #[macro_use]
 extern crate seed;
 
 mod json;
 mod proto;
+mod state;
+mod view;
 
 use seed::{prelude::*, App};
 use wasm_bindgen::JsCast;
@@ -13,104 +13,21 @@ use web_sys::{
     BinaryType, MessageEvent, WebSocket,
 };
 
+use crate::{
+    state::{update, Model, ModelEvent},
+    view::view,
+};
+
 const WS_URL: &str = "ws://127.0.0.1:8080/ws/";
 
-#[derive(Clone, Default)]
-struct Model {
-    connected: bool,
-    msg_rx_cnt: usize,
-    msg_tx_cnt: usize,
-    input_text: String,
-    messages: Vec<String>,
-}
-
-#[derive(Clone)]
-enum Msg {
-    Connected,
-    ServerMsg(json::ServerMsg),
-    Send(json::ClientMsg),
-    Sent,
-    EditChange(String),
-}
-
-fn update(msg: Msg, mut model: &mut Model) -> Update<Msg> {
-    match msg {
-        Msg::Connected => {
-            model.connected = true;
-            Render.into()
-        }
-        Msg::ServerMsg(msg) => {
-            model.connected = true;
-            model.msg_rx_cnt += 1;
-            model.messages.push(msg.text);
-            Render.into()
-        }
-        Msg::EditChange(input_text) => {
-            model.input_text = input_text;
-            Render.into()
-        }
-        Msg::Send(_) => Skip.into(),
-        Msg::Sent => {
-            model.input_text = "".into();
-            model.msg_tx_cnt += 1;
-            Render.into()
-        }
-    }
-}
-
-fn render_messages(msgs: &[String]) -> El<Msg> {
-    let msgs: Vec<_> = msgs.iter().map(|m| p![m]).collect();
-    div![msgs]
-}
-
-fn view(model: &Model) -> El<Msg> {
-    div![
-        h1!["HEB App"],
-        if model.connected {
-            div![
-                input![
-                    attrs! {
-                        "type"=>"text";
-                        "id"=>"text";
-                        At::Value => model.input_text;
-                    },
-                    input_ev(Ev::Input, Msg::EditChange)
-                ],
-                button![
-                    attrs! {"type"=>"button";"id"=>"send"},
-                    simple_ev(
-                        "click",
-                        Msg::Send(json::ClientMsg {
-                            text: model.input_text.clone()
-                        })
-                    ),
-                    "Send"
-                ]
-            ]
-        } else {
-            div![p![em!["Connecting..."]]]
-        },
-        render_messages(&model.messages),
-        footer![
-            if model.connected {
-                p!["Connected"]
-            } else {
-                p!["Disconnected"]
-            },
-            p![format!("{} messages received", model.msg_rx_cnt)],
-            p![format!("{} messages sent", model.msg_tx_cnt)]
-        ]
-    ]
-}
-
-fn open_ws(state: App<Msg, Model>) {
+fn open_ws(state: App<ModelEvent, Model>) {
     let ws = WebSocket::new(WS_URL).unwrap();
     ws.set_binary_type(BinaryType::Arraybuffer);
 
     let s = state.clone();
     let on_open = Closure::wrap(Box::new(move |_| {
         log!("WebSocket connection is open now");
-        s.update(Msg::Connected);
+        s.update(ModelEvent::Connected);
     }) as Box<FnMut(JsValue)>);
 
     let on_close = Closure::wrap(Box::new(|_| {
@@ -123,7 +40,7 @@ fn open_ws(state: App<Msg, Model>) {
         let txt = ev.data().as_string().unwrap();
         let json: json::ServerMsg = serde_json::from_str(&txt).unwrap();
         log_2(&"text message:".into(), &txt.into());
-        s.update(Msg::ServerMsg(json));
+        s.update(ModelEvent::ServerMsg(json));
     }) as Box<FnMut(MessageEvent)>);
 
     let on_error = Closure::wrap(Box::new(|_| {
@@ -140,10 +57,10 @@ fn open_ws(state: App<Msg, Model>) {
     on_error.forget();
     let app = state.clone();
     state.add_message_listener(move |msg| match msg {
-        Msg::Send(msg) => {
+        ModelEvent::Send(msg) => {
             let s = serde_json::to_string(msg).unwrap();
             ws.send_with_str(&s).unwrap();
-            app.update(Msg::Sent);
+            app.update(ModelEvent::Sent);
         }
         _ => {}
     });
