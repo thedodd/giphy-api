@@ -18,6 +18,7 @@ workspace = false
 script_runner = "@shell"
 script = ['''
 cp ./client/index.html ./static
+cp ./client/index.css ./static
 ''']
 
 [tasks.server-build]

@@ -25,27 +25,30 @@ message Error {
 /// Message types here come in pairs. If a Request is sent with a particular request variant, its
 /// corresponding Response variant will be returned. This invariant is part of the API's contract.
 
+// A request to register a new account.
+message RegisterRequest {
+  string email = 1;
+  string password = 2;
+}
+
+// The response to a register request.
+message RegisterResponse {
+  string id = 1;
+  string email = 2;
+  string jwt = 3;
+}
+
 // A login request.
 message LoginRequest {
-  string username = 1;
+  string email = 1;
   string password = 2;
 }
 
 // The response to a login request.
 message LoginResponse {
-  Error error = 1;
-  string jwt = 2;
-}
-
-// A request to refresh the given JWT.
-message RefreshTokenRequest {
+  string id = 1;
+  string email = 2;
   string jwt = 3;
-}
-
-// The response to a refresh token request.
-message RefreshTokenResponse {
-  Error error = 1;
-  string jwt = 2;
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////
@@ -62,8 +65,8 @@ message RequestFrame {
   // request frames with response frames over a websocket.
   string id = 1;
   oneof request {
-    LoginRequest login = 10;
-    RefreshTokenRequest refresh_token = 11;
+    RegisterRequest register = 10;
+    LoginRequest login = 11;
   }
 }
 
@@ -71,8 +74,10 @@ message RequestFrame {
 message ResponseFrame {
   // The ID of the original request which produced this frame.
   string id = 1;
+  // If error is populated, then no response variant will be populated.
+  Error error = 2;
   oneof response {
-    LoginResponse login = 10;
-    RefreshTokenResponse refresh_token = 11;
+    RegisterResponse register = 10;
+    LoginResponse login = 11;
   }
 }

@@ -3,12 +3,10 @@ use std::time::{Duration, Instant};
 use actix::prelude::*;
 use actix_web::ws;
 use log::{debug};
-use prost::Message as ProtoMessage;
 
 use crate::{
+    app::AppState,
     handlers::{Request, SocketHandler},
-    proto::api::{ResponseFrame},
-    AppState,
 };
 
 /// Interval for sending heartbeats to the client.
@@ -56,12 +54,9 @@ impl StreamHandler<ws::Message, ws::ProtocolError> for SocketState {
                 .into_actor(self)
                 .then(|res, _actor, ctx| {
                     match res {
-                        // Ok(payload) => ctx.binary(payload),
-                        Ok(payload) => {
-                            let frame = ResponseFrame::decode(payload.clone()).unwrap();
-                            debug!("Sending frame with ID: {}", frame.id);
-                            debug!("Len of bytes: {}", payload.len());
-                            ctx.binary(payload);
+                        Ok(inner) => match inner {
+                            Ok(payload) => ctx.binary(payload),
+                            Err(_) => unreachable!(),
                         }
                         Err(_) => unreachable!(),
                     }

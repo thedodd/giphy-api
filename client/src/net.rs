@@ -8,7 +8,8 @@ use web_sys::{BinaryType, MessageEvent, WebSocket};
 
 use crate::{
     AppState,
-    proto::api::{RequestFrame, ResponseFrame},
+    containers::LoginContainerEvent,
+    proto::api::{RequestFrame, ResponseFrame, response_frame::Response},
     state::{Model, ModelEvent},
 };
 
@@ -39,9 +40,11 @@ pub struct NetworkState {
 pub enum NetworkEvent {
     Connected,
     Disconnected,
+    // Reconnect, // TODO: implement this. Will need to create a cycle with Box<AppState>.
     NewSocket(WebSocket),
     NewClosure(Rc<WSClosure>),
     SendRequest(RequestFrame),
+    Received(ResponseFrame),
 }
 
 impl NetworkEvent {
@@ -58,6 +61,14 @@ impl NetworkEvent {
                 model.network.closures.clear();
                 Render.into()
             }
+            // NetworkEvent::Reconnect => {
+            //     model.network.connected = false;
+            //     model.network.socket = None;
+            //     model.network.closures.clear();
+            //     // open_ws(state: AppState)
+            //     Update::with_msg(effect_msg: Ms)
+            //     Render.into()
+            // }
             NetworkEvent::NewSocket(ws) => {
                 model.network.socket = Some(ws);
                 Render.into()
@@ -73,11 +84,29 @@ impl NetworkEvent {
                 };
                 let mut buf = vec![];
                 req.encode(&mut buf).unwrap(); // This will never fail.
-                ws.send_with_u8_array(buf.as_mut_slice())
-                    .expect("Expected to be able to send socket message."); // TODO: handle this error condition.
-                model.input_text = "".into();
-                model.msg_tx_cnt += 1;
-                Render.into()
+                if let Err(err) = ws.send_with_u8_array(buf.as_mut_slice()) {
+                    log!(format!("Failed to send request to API. {:?}", err));
+                }
+                Skip.into()
+            }
+            NetworkEvent::Received(frame) => {
+                // TODO: handle error conditions.
+                if let Some(err) = &frame.error {
+                    log!(format!("Error received from backend. {:?}", err));
+                    return Skip.into();
+                }
+
+                // We've received a valid response frame from the server. Route it.
+                match frame.response {
+                    Some(Response::Login(res)) =>
+                        Update::with_msg(ModelEvent::Login(LoginContainerEvent::LoginResponse(res))),
+                    Some(Response::Register(res)) =>
+                        Update::with_msg(ModelEvent::Login(LoginContainerEvent::RegisterResponse(res))),
+                    None => {
+                        log!("Response frame from API did not have an error and did not have a response variant.");
+                        Skip.into()
+                    }
+                }
             }
         }
     }
@@ -157,8 +186,7 @@ fn build_on_message(state: AppState) -> HandleMessage {
         };
 
         // Process the recived message in our state update system.
-        log!(format!("Decoded message: {:?}", &frame));
-        state.update(ModelEvent::ServerMsg(frame));
+        state.update(ModelEvent::Network(NetworkEvent::Received(frame)));
     };
     Closure::wrap(Box::new(handler) as Box<FnMut(MessageEvent)>)
 }
