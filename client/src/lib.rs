@@ -1,7 +1,6 @@
 #[macro_use]
 extern crate seed;
 
-mod json;
 mod proto;
 mod state;
 mod net;

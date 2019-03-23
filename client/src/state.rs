@@ -1,15 +1,14 @@
 use seed::prelude::*;
 
 use crate::{
-    proto::api::{
-        RequestFrame, ResponseFrame,
-    },
+    net::{NetworkEvent, NetworkState},
+    proto::api::ResponseFrame,
 };
 
 /// The root data model of this application.
 #[derive(Clone, Default)]
 pub struct Model {
-    pub connected: bool,
+    pub network: NetworkState,
     pub msg_rx_cnt: usize,
     pub msg_tx_cnt: usize,
     pub input_text: String,
@@ -19,34 +18,24 @@ pub struct Model {
 /// The different types of events which may influence the application's state.
 #[derive(Clone)]
 pub enum ModelEvent {
-    Connected,
+    Network(NetworkEvent),
     ServerMsg(ResponseFrame),
-    Send(RequestFrame),
-    Sent,
     EditChange(String),
 }
 
 /// The application's state update handler.
 pub fn update(msg: ModelEvent, mut model: &mut Model) -> Update<ModelEvent> {
     match msg {
-        ModelEvent::Connected => {
-            model.connected = true;
-            Render.into()
+        ModelEvent::Network(event) => {
+            NetworkEvent::reducer(event, model)
         }
         ModelEvent::ServerMsg(msg) => {
-            model.connected = true;
             model.msg_rx_cnt += 1;
             model.messages.push(msg.id);
             Render.into()
         }
         ModelEvent::EditChange(input_text) => {
             model.input_text = input_text;
-            Render.into()
-        }
-        ModelEvent::Send(_) => Skip.into(),
-        ModelEvent::Sent => {
-            model.input_text = "".into();
-            model.msg_tx_cnt += 1;
             Render.into()
         }
     }

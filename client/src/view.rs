@@ -1,6 +1,7 @@
 use seed::prelude::*;
 
 use crate::{
+    net::NetworkEvent,
     proto::api::{LoginRequest, RequestFrame},
     state::{Model, ModelEvent},
 };
@@ -9,7 +10,7 @@ use crate::{
 pub fn view(model: &Model) -> El<ModelEvent> {
     div![
         h1!["HEB App"],
-        if model.connected {
+        if model.network.connected {
             div![
                 input![
                     attrs! {
@@ -23,10 +24,7 @@ pub fn view(model: &Model) -> El<ModelEvent> {
                     attrs! {"type"=>"button";"id"=>"send"},
                     simple_ev(
                         "click",
-                        ModelEvent::Send(RequestFrame::login(LoginRequest{
-                            username: model.input_text.clone(),
-                            password: model.input_text.clone(),
-                        }))
+                        build_login_request(model.input_text.clone(), model.input_text.clone())
                     ),
                     "Login"
                 ]
@@ -36,7 +34,7 @@ pub fn view(model: &Model) -> El<ModelEvent> {
         },
         render_messages(&model.messages),
         footer![
-            if model.connected {
+            if model.network.connected {
                 p!["Connected"]
             } else {
                 p!["Disconnected"]
@@ -50,4 +48,9 @@ pub fn view(model: &Model) -> El<ModelEvent> {
 fn render_messages(msgs: &[String]) -> El<ModelEvent> {
     let msgs: Vec<_> = msgs.iter().map(|m| p![m]).collect();
     div![msgs]
+}
+
+fn build_login_request(username: String, password: String) -> ModelEvent {
+    let req = RequestFrame::login(LoginRequest{username, password});
+    ModelEvent::Network(NetworkEvent::SendRequest(req))
 }
