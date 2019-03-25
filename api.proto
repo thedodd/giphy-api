@@ -4,19 +4,44 @@ package api;
 //////////////////////////////////////////////////////////////////////////////////////////////////
 /// Components ///////////////////////////////////////////////////////////////////////////////////
 
-// A user friendly description of an error which has taken place on the server.
-message Error {
-  // A user friendly message describing the error.
+// A type representing an error which has taken place in some domain specific manner.
+message ErrorDomain {
+  // A description of the error.
   string description = 1;
+  // Error information specific to fields of the domain request.
+  map<string,string> fields = 2;
+}
 
-  // The HTTP status which classifies this type of error.
-  uint32 status = 2;
+// The possible variants of an error response.
+enum ErrorResponseType {
+  // An internal server error.
+  ETYPE_ISE = 0;
 
-  // An internal code used to drive client behavior.
-  string code = 3;
+  // An error indicating the that user has failed authentication.
+  //
+  // Typically this means that the user's JWT is expired.
+  ETYPE_AUTHN = 1;
 
-  // Additional metadata on the error.
-  map<string,string> meta = 4;
+  // An error indicating that the received payload was invalid.
+  //
+  // Typically this means that the frame couldn't even be decoded. Errors specific to business
+  // logic requests MUST NOT appear here.
+  ETYPE_INVALID = 2;
+}
+
+// A GIF from the Giphy API.
+message GiphyGif {
+  string id = 1;
+  string title = 2;
+  string url = 3;
+  bool is_favorite = 4;
+}
+
+// A GIF which has been favorited by a user.
+message FavoriteGif {
+  string id = 1;
+  GiphyGif gif = 2;
+  string category = 3;
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////
@@ -24,6 +49,17 @@ message Error {
 ///
 /// Message types here come in pairs. If a Request is sent with a particular request variant, its
 /// corresponding Response variant will be returned. This invariant is part of the API's contract.
+
+// A response which represents an error outside of the corresponding request's domain.
+//
+// This typically will be returned as part of an authentication failure, or an ISE.
+message ErrorResponse {
+  // A user friendly message describing the error.
+  string description = 1;
+
+  // The type of error which this represents.
+  ErrorResponseType etype = 2;
+}
 
 // A request to register a new account.
 message RegisterRequest {
@@ -33,9 +69,11 @@ message RegisterRequest {
 
 // The response to a register request.
 message RegisterResponse {
-  string id = 1;
-  string email = 2;
-  string jwt = 3;
+  ErrorDomain error = 1;
+  // The user's ID.
+  string id = 2;
+  string email = 3;
+  string jwt = 4;
 }
 
 // A login request.
@@ -46,9 +84,23 @@ message LoginRequest {
 
 // The response to a login request.
 message LoginResponse {
-  string id = 1;
-  string email = 2;
-  string jwt = 3;
+  ErrorDomain error = 1;
+  // The user's ID.
+  string id = 2;
+  string email = 3;
+  string jwt = 4;
+}
+
+// A request to search the Giphy API.
+message SearchGiphyRequest {
+  string jwt = 1;
+  string query = 2;
+}
+
+// The response to a Giphy search request.
+message SearchGiphyResponse {
+  ErrorDomain error = 1;
+  repeated GiphyGif gifs = 2;
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////
@@ -67,6 +119,7 @@ message RequestFrame {
   oneof request {
     RegisterRequest register = 10;
     LoginRequest login = 11;
+    SearchGiphyRequest search_giphy = 12;
   }
 }
 
@@ -74,10 +127,10 @@ message RequestFrame {
 message ResponseFrame {
   // The ID of the original request which produced this frame.
   string id = 1;
-  // If error is populated, then no response variant will be populated.
-  Error error = 2;
   oneof response {
-    RegisterResponse register = 10;
-    LoginResponse login = 11;
+    ErrorResponse error = 10;
+    RegisterResponse register = 11;
+    LoginResponse login = 12;
+    SearchGiphyResponse search_giphy = 13;
   }
 }

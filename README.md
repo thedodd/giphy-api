@@ -3,12 +3,15 @@ giphy api
 Design and implement a web application that allows a user to search for and save animated GIFs to a user profile using the [GIPHY API](https://developers.giphy.com/docs/).
 
 **Requirements:**
-- Provide users with the ability to register and login to your application.
-- As well as the ability to save and view their favorite GIFs to their profile.
-- Also provide the user with the ability to categorize these saved GIFs(ex: funny, animals, etc.).
-- User data should be stored in a database.
-- Basic application security practices should be implemented (OWASP Top 9).
-- GIFs available on your application should be limited to a G-Rating.
+- [x] Provide users with the ability to register and login to your application.
+- [x] As well as the ability to search for animated GIFs from the GIPHY API.
+- [ ] As well as the ability to save and view their favorite GIFs to their profile.
+- [ ] Also provide the user with the ability to categorize these saved GIFs (ex: funny, animals, etc.).
+- [x] User data should be stored in a database.
+- [x] Basic application security practices should be implemented (OWASP Top 9).
+- [x] GIFs available on your application should be limited to a G-Rating.
+
+**NB:** items marked as `// FUTURE:` are simply items which I've skipped over in the name of brevity, but which we would normally want to finish implementing before deploying.
 
 ### overview
 #### api

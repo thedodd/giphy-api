@@ -47,12 +47,17 @@ pub fn new_app(socket_handler: Addr<SocketHandler>) -> Addr<Server> {
             .resource("/ws/", |r| r.route().f(handle_socket))
 
             // Build static file handler.
-            .handler("/", StaticFiles::with_config(STATIC_DIR, StaticFileServerConfig)
+            .handler("/static/", StaticFiles::with_config(STATIC_DIR, StaticFileServerConfig)
                 .expect("Failed to build static file handler. Probably means static dir is bad or there are FS issues.")
                 .default_handler(|_req: &HttpRequest<AppState>| -> Result<NamedFile> {
                     let path = Path::new(STATIC_DIR).join("index.html");
                     Ok(NamedFile::open(path)?)
                 }))
+
+            .default_resource(|r| r.get().h(|_req: &HttpRequest<AppState>| -> Result<NamedFile> {
+                let path = Path::new(STATIC_DIR).join("index.html");
+                Ok(NamedFile::open(path)?)
+            }))
 
             .finish()
     })

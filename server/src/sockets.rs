@@ -36,6 +36,7 @@ impl StreamHandler<ws::Message, ws::ProtocolError> for SocketState {
         self.hb = Instant::now();
         match msg {
             ws::Message::Close(_) => {
+                debug!("Closing socket.");
                 ctx.stop();
             }
             ws::Message::Ping(msg) => {

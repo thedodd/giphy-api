@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use actix::prelude::*;
 use bcrypt::{BcryptError, DEFAULT_COST, hash, verify};
 use log::{error};
@@ -13,7 +15,10 @@ use validator_derive::Validate;
 
 use crate::{
     config::Config,
-    proto::api::Error,
+    proto::{
+        api::{ErrorDomain, ErrorResponse},
+        api_ext::Error::{self, ErrSystem, ErrDomain},
+    },
     models::User,
 };
 
@@ -74,13 +79,15 @@ impl Handler<CreateUser> for MongoExecutor {
         // Validate given input.
         // FUTURE: ensure password is complex enough.
         let _ = msg.validate().map_err(|err| {
-            Error::new(&err.to_string(), 400, None, None)
+            let mut fields = HashMap::new();
+            err.field_errors().into_iter().map(|(k, v)| fields.insert(k.to_string(), v[0].to_string()));
+            ErrDomain(ErrorDomain::new("Invalid input.", Some(fields)))
         })?;
 
         // Hash the user's password.
         let pwhash = hash(&msg.password, DEFAULT_COST).map_err(|err| {
             error!("Failed to hash given password. {:?}", err);
-            Error::new_ise(None, None)
+            ErrSystem(ErrorResponse::new_ise())
         })?;
 
         // Build new model instance and attempt to insert into DB.
@@ -90,11 +97,11 @@ impl Handler<CreateUser> for MongoExecutor {
         let _ = match user.save(self.0.clone(), None) {
             Ok(()) => Ok(()),
             Err(MongoError::OperationError(ref val)) if val.starts_with("E11000") => {
-                Err(Error::new("Given email is already in use.", 400, None, None))
+                Err(ErrDomain(ErrorDomain::new("Given email is already in use.", None)))
             }
             Err(err) => {
                 error!("Error saving user model. {:?}", err);
-                Err(Error::new_ise(None, None))
+                Err(ErrSystem(ErrorResponse::new_ise()))
             }
         }?;
 
@@ -112,11 +119,11 @@ impl Handler<FindUserWithCreds> for MongoExecutor {
         let user = match User::find_one(self.0.clone(), Some(doc!{"email": email}), None) {
             Ok(Some(user)) => Ok(user),
             Ok(None) => {
-                Err(Error::new("Invalid credentials provided.", 400, None, None))
+                Err(ErrDomain(ErrorDomain::new("Invalid credentials provided.", None)))
             }
             Err(err) => {
                 error!("Error while looking up user. {:?}", err);
-                Err(Error::new_ise(None, None))
+                Err(ErrSystem(ErrorResponse::new_ise()))
             }
         }?;
 
@@ -124,11 +131,11 @@ impl Handler<FindUserWithCreds> for MongoExecutor {
         match verify(&msg.password, &user.pwhash) {
             Ok(_) => Ok(user),
             Err(BcryptError::InvalidPassword) => {
-                Err(Error::new("Invalid credentials provided.", 400, None, None))
+                Err(ErrDomain(ErrorDomain::new("Invalid credentials provided.", None)))
             }
             Err(err) => {
                 error!("Error from bcrypt while checking user's password. {:?}", err);
-                Err(Error::new_ise(None, None))
+                Err(ErrSystem(ErrorResponse::new_ise()))
             }
         }
     }

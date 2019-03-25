@@ -8,8 +8,8 @@ use web_sys::{BinaryType, MessageEvent, WebSocket};
 
 use crate::{
     AppState,
-    containers::LoginContainerEvent,
-    proto::api::{RequestFrame, ResponseFrame, response_frame::Response},
+    containers::{LoginContainerEvent, SearchContainerEvent},
+    proto::api::{ErrorResponseType, RequestFrame, ResponseFrame, response_frame::Response},
     state::{Model, ModelEvent},
 };
 
@@ -90,18 +90,30 @@ impl NetworkEvent {
                 Skip.into()
             }
             NetworkEvent::Received(frame) => {
-                // TODO: handle error conditions.
-                if let Some(err) = &frame.error {
-                    log!(format!("Error received from backend. {:?}", err));
-                    return Skip.into();
-                }
-
                 // We've received a valid response frame from the server. Route it.
+                use ErrorResponseType::{EtypeAuthn, EtypeIse, EtypeInvalid};
                 match frame.response {
+                    Some(Response::Error(err)) => match ErrorResponseType::from_i32(err.etype) {
+                        Some(EtypeAuthn) => Update::with_msg(ModelEvent::Logout),
+                        Some(EtypeIse) => {
+                            log!("Server returned an ISE. Long term, we would map this to a request ID for handling.");
+                            Skip.into()
+                        },
+                        Some(EtypeInvalid) => {
+                            log!("Server received a malformed frame from this client.");
+                            Skip.into()
+                        },
+                        None => {
+                            log!("Server returned an unknown error type.");
+                            Skip.into()
+                        }
+                    }
                     Some(Response::Login(res)) =>
                         Update::with_msg(ModelEvent::Login(LoginContainerEvent::LoginResponse(res))),
                     Some(Response::Register(res)) =>
                         Update::with_msg(ModelEvent::Login(LoginContainerEvent::RegisterResponse(res))),
+                    Some(Response::SearchGiphy(res)) =>
+                        Update::with_msg(ModelEvent::Search(SearchContainerEvent::SearchResponse(res))),
                     None => {
                         log!("Response frame from API did not have an error and did not have a response variant.");
                         Skip.into()

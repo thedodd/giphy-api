@@ -4,7 +4,7 @@ use serde_derive::{Deserialize, Serialize};
 use simple_jwt::{Algorithm, encode, decode};
 use time::Duration;
 
-use crate::proto::api::Error;
+use crate::proto::api::ErrorResponse;
 
 /// The definition of our JWT claims structure.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
@@ -25,7 +25,7 @@ pub struct Claims {
 
 impl Claims {
     /// Generate a new JWT for the user specified by ID.
-    pub fn new<'a>(private_key: &'a str, sub: String) -> Result<String, Error> {
+    pub fn new<'a>(private_key: &'a str, sub: String) -> Result<String, ErrorResponse> {
         // Build a new claims body.
         let now = Utc::now();
         let exp = now + Duration::minutes(30);
@@ -36,7 +36,7 @@ impl Claims {
             Ok(t) => Ok(t),
             Err(err) => {
                 error!("Error generating new JWT for user: {}", err);
-                Err(Error::new_ise(None, None))
+                Err(ErrorResponse::new_ise())
             }
         }
     }
@@ -46,13 +46,13 @@ impl Claims {
     /// This routine will check the veracity of the token's signature, ensuring the token
     /// has not been tampered with — which also ensures it was issued by our system — and
     /// will also ensure that the token is not expired.
-    pub fn from_jwt<'a>(jwt: &'a str, pub_key: &'a str) -> Result<Claims, Error> {
+    pub fn from_jwt<'a>(jwt: &'a str, pub_key: &'a str) -> Result<Claims, ErrorResponse> {
         // Decode token & extract claims.
         let claims = match decode::<Claims>(jwt, pub_key) {
             Ok(t) => t,
             Err(err) => {
                 error!("Error decoding JWT. {}", err);
-                return Err(Error::new("Unauthorized.", 401, None, None));
+                return Err(ErrorResponse::new_authn());
             },
         };
 
@@ -67,9 +67,9 @@ impl Claims {
     ///
     /// This routine is private, as it only needs to be called when the `Claims` object
     /// is initially extracted from its JWT.
-    fn must_not_be_expired(&self) -> Result<(), Error> {
+    fn must_not_be_expired(&self) -> Result<(), ErrorResponse> {
         if Utc::now().timestamp() > self.exp {
-            Err(Error::new("Unauthorized. Token is expired.", 401, None, None))
+            Err(ErrorResponse::new_authn())
         } else {
             Ok(())
         }

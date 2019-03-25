@@ -17,8 +17,8 @@ use wither::prelude::*;
 use crate::{
     app::new_app,
     db::MongoExecutor,
-    models::User,
     handlers::SocketHandler,
+    models::User,
 };
 
 fn main() {
