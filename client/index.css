@@ -36,7 +36,25 @@
 * Helpers ***************************************************************************************
 *************************************************************************************************/
 
+/* Margin */
+
 .mh-auto {
     margin-left: auto;
     margin-right: auto;
+}
+
+.mb-half {
+    margin-bottom: 0.5rem !important;
+}
+
+/* Padding */
+
+.p-three-quarter {
+    padding: 0.75rem !important;
+}
+
+/* Flex */
+
+.justify-content-center {
+    justify-content: center;
 }

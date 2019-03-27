@@ -1,18 +1,19 @@
 #[macro_use]
 extern crate seed;
 
+mod api;
 mod components;
 mod containers;
-mod proto;
-mod net;
 mod router;
 mod state;
+mod ui;
+mod utils;
 
+use common::User;
 use seed::{prelude::*, App};
 
 use crate::{
     state::{update, Model, ModelEvent},
-    net::open_ws,
     containers::app,
 };
 
@@ -27,12 +28,9 @@ pub fn start() {
     let app = App::build(model, update, app)
         .routes(router::router).finish().run();
 
-    // Attempt to open initial connection with backend.
-    open_ws(app.clone());
-
     // Attempt to load any session data.
-    match state::get_session_item("user") {
-        Ok(user_json) => match serde_json::from_str::<state::User>(&user_json) {
+    match utils::get_session_item("user") {
+        Ok(user_json) => match serde_json::from_str::<User>(&user_json) {
             Ok(user) => app.update(state::ModelEvent::Initialized(Some(user))),
             Err(_) => app.update(state::ModelEvent::Initialized(None)),
         }

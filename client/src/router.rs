@@ -66,14 +66,3 @@ pub fn router(url: &Url) -> ModelEvent {
         }
     }
 }
-
-// TODO: probably kill this.
-// /// Get the current URl.
-// ///
-// /// **NB:** this technically has the possibility of panicing if we are not running in
-// /// a browser, or if there is some critical error within web-sys land. Shouldn't happen though.
-// pub fn get_url() -> Url {
-//     let w = web_sys::window().expect("Failed to get a handle to the browser's window object.");
-//     let d = w.document().expect("Failed to access the brower's current document.");
-//     Url::from(d.url().expect("Failed to access the browser's current URL."))
-// }

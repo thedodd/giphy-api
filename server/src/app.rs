@@ -1,50 +1,49 @@
-use std::path::Path;
+use std::{
+    path::Path,
+    sync::Arc,
+};
 
 use actix::prelude::*;
 use actix_web::{
-    server, ws,
+    server,
     fs::{NamedFile, StaticFileConfig, StaticFiles},
-    App, HttpRequest, HttpResponse, Result,
+    http::Method,
+    App, HttpRequest, Result,
 };
 use actix_net::server::Server;
 use log::info;
+use reqwest::r#async::Client;
 
-use crate::{handlers::SocketHandler, sockets::SocketState};
+use crate::{
+    config::Config,
+    db::MongoExecutor,
+    handlers,
+};
 
 const STATIC_DIR: &str = "./static";
 
-#[derive(Default)]
-struct StaticFileServerConfig;
-
-impl StaticFileConfig for StaticFileServerConfig {
-    fn is_use_etag() -> bool {
-        true
-    }
-
-    fn is_use_last_modifier() -> bool {
-        true
-    }
-}
-
 /// The application state object.
 pub struct AppState {
-    socket_handler: Addr<SocketHandler>,
+    pub client: Client,
+    pub config: Arc<Config>,
+    pub db: Addr<MongoExecutor>,
 }
 
-/// A simple handler for setting up WS connections.
-fn handle_socket(req: &HttpRequest<AppState>) -> Result<HttpResponse> {
-    let socket_handler = req.state().socket_handler.clone();
-    ws::start(req, SocketState::new(socket_handler))
-}
-
-pub fn new_app(socket_handler: Addr<SocketHandler>) -> Addr<Server> {
+pub fn new_app(db: Addr<MongoExecutor>, client: Client, config: Arc<Config>) -> Addr<Server> {
     let app = server::new(move || {
-        let state = AppState {
-            socket_handler: socket_handler.clone(),
+        let state = AppState{
+            client: client.clone(),
+            config: config.clone(),
+            db: db.clone(),
         };
 
         App::with_state(state)
-            .resource("/ws/", |r| r.route().f(handle_socket))
+            .scope("/api", |scope| {
+                scope.resource("/register", |r| r.method(Method::POST).with(handlers::register))
+                    .resource("/login", |r| r.method(Method::POST).with(handlers::login))
+                    .resource("/search_giphy", |r| r.method(Method::POST).with(handlers::search_giphy))
+                    .resource("/save_gif", |r| r.method(Method::POST).with(handlers::save_gif))
+            })
 
             // Build static file handler.
             .handler("/static/", StaticFiles::with_config(STATIC_DIR, StaticFileServerConfig)
@@ -67,4 +66,18 @@ pub fn new_app(socket_handler: Addr<SocketHandler>) -> Addr<Server> {
 
     info!("Server is listening on 127.0.0.1:8080.");
     app
+}
+
+/// The static file server configuration for this API.
+#[derive(Default)]
+struct StaticFileServerConfig;
+
+impl StaticFileConfig for StaticFileServerConfig {
+    fn is_use_etag() -> bool {
+        true
+    }
+
+    fn is_use_last_modifier() -> bool {
+        true
+    }
 }

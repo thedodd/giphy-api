@@ -2,53 +2,62 @@ use std::collections::HashMap;
 
 use actix::prelude::*;
 use bcrypt::{BcryptError, DEFAULT_COST, hash, verify};
+use common::{
+    Error, GiphyGif, LoginRequest, RegisterRequest,
+};
 use log::{error};
+use validator::Validate;
 use wither::{
     prelude::*,
     mongodb::{
-        doc, bson,
+        doc, bson, oid::ObjectId,
         Error as MongoError, Client, ThreadedClient, db::Database,
     }
 };
-use validator::{Validate};
-use validator_derive::Validate;
 
 use crate::{
     config::Config,
-    proto::{
-        api::{ErrorDomain, ErrorResponse},
-        api_ext::Error::{self, ErrSystem, ErrDomain},
-    },
-    models::User,
+    models::{SavedGif, User},
 };
 
 //////////////////////////////////////////////////////////////////////////////////////////////////
 // CreateUser ////////////////////////////////////////////////////////////////////////////////////
 
 /// A message type for creating users.
-#[derive(Validate)]
-pub struct CreateUser {
-    #[validate(email(message="Must provide a valid email address."))]
-    pub email: String,
-    #[validate(length(min="6", message="Password must be at least 6 characters in length."))]
-    pub password: String,
-}
+pub struct CreateUser(pub RegisterRequest);
 
 impl Message for CreateUser {
     type Result = Result<User, Error>;
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////
-// CreateUser ////////////////////////////////////////////////////////////////////////////////////
+// FindUserSavedGifs /////////////////////////////////////////////////////////////////////////////
+
+/// A message type for looking up a user's saved GIFs.
+pub struct FindUserSavedGifs(pub ObjectId);
+
+impl Message for FindUserSavedGifs {
+    type Result = Result<Vec<SavedGif>, Error>;
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////////////
+// FindUserWithCreds /////////////////////////////////////////////////////////////////////////////
 
 /// A message type for looking up a user with matching creds.
-pub struct FindUserWithCreds {
-    pub email: String,
-    pub password: String,
-}
+pub struct FindUserWithCreds(pub LoginRequest);
 
 impl Message for FindUserWithCreds {
     type Result = Result<User, Error>;
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////////////
+// SaveGif ///////////////////////////////////////////////////////////////////////////////////////
+
+/// A message type for saving a GIF for a user.
+pub struct SaveGif(pub ObjectId, pub GiphyGif);
+
+impl Message for SaveGif {
+    type Result = Result<SavedGif, Error>;
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////
@@ -72,36 +81,38 @@ impl MongoExecutor {
 }
 
 impl Handler<CreateUser> for MongoExecutor {
-    type Result = Result<User, Error>;
+    type Result = <CreateUser as Message>::Result;
 
     /// Handle creation of new users.
     fn handle(&mut self, msg: CreateUser, _: &mut Self::Context) -> Self::Result {
         // Validate given input.
         // FUTURE: ensure password is complex enough.
-        let _ = msg.validate().map_err(|err| {
+        let _ = (&msg.0).validate().map_err(|err| {
             let mut fields = HashMap::new();
-            err.field_errors().into_iter().map(|(k, v)| fields.insert(k.to_string(), v[0].to_string()));
-            ErrDomain(ErrorDomain::new("Invalid input.", Some(fields)))
+            err.field_errors().into_iter().for_each(|(k, v)| {
+                fields.insert(k.to_string(), v[0].to_string());
+            });
+            Error::new("Invalid input.", 400, Some(fields))
         })?;
 
         // Hash the user's password.
-        let pwhash = hash(&msg.password, DEFAULT_COST).map_err(|err| {
+        let pwhash = hash(&msg.0.password, DEFAULT_COST).map_err(|err| {
             error!("Failed to hash given password. {:?}", err);
-            ErrSystem(ErrorResponse::new_ise())
+            Error::new_ise()
         })?;
 
         // Build new model instance and attempt to insert into DB.
         // If email is already in use, this will return a unique index violation.
-        let email = msg.email.to_lowercase(); // Make things consistent.
+        let email = msg.0.email.to_lowercase(); // Make things consistent.
         let mut user = User::new(email, pwhash);
         let _ = match user.save(self.0.clone(), None) {
             Ok(()) => Ok(()),
             Err(MongoError::OperationError(ref val)) if val.starts_with("E11000") => {
-                Err(ErrDomain(ErrorDomain::new("Given email is already in use.", None)))
+                Err(Error::new("Given email is already in use.", 400, None))
             }
             Err(err) => {
                 error!("Error saving user model. {:?}", err);
-                Err(ErrSystem(ErrorResponse::new_ise()))
+                Err(Error::new_ise())
             }
         }?;
 
@@ -109,34 +120,67 @@ impl Handler<CreateUser> for MongoExecutor {
     }
 }
 
+impl Handler<FindUserSavedGifs> for MongoExecutor {
+    type Result = <FindUserSavedGifs as Message>::Result;
+
+    /// Handle fetching a user's saved GIFs.
+    fn handle(&mut self, msg: FindUserSavedGifs, _: &mut Self::Context) -> Self::Result {
+        // Fetch all saved user GIFs.
+        match SavedGif::find(self.0.clone(), Some(doc!{"user": msg.0}), None) {
+            Ok(gifs) => Ok(gifs),
+            Err(err) => {
+                error!("Error fatching user's saved GIFs. {:?}", err);
+                Err(Error::new_ise())
+            }
+        }
+    }
+}
+
 impl Handler<FindUserWithCreds> for MongoExecutor {
-    type Result = Result<User, Error>;
+    type Result = <FindUserWithCreds as Message>::Result;
 
     /// Handle lookup of user with matching creds.
     fn handle(&mut self, msg: FindUserWithCreds, _: &mut Self::Context) -> Self::Result {
         // Search for user with given credentials.
-        let email = msg.email.to_lowercase(); // Make things consistent.
+        let email = msg.0.email.to_lowercase(); // Make things consistent.
         let user = match User::find_one(self.0.clone(), Some(doc!{"email": email}), None) {
             Ok(Some(user)) => Ok(user),
             Ok(None) => {
-                Err(ErrDomain(ErrorDomain::new("Invalid credentials provided.", None)))
+                Err(Error::new("Invalid credentials provided.", 400, None))
             }
             Err(err) => {
                 error!("Error while looking up user. {:?}", err);
-                Err(ErrSystem(ErrorResponse::new_ise()))
+                Err(Error::new_ise())
             }
         }?;
 
         // Check the user's creds.
-        match verify(&msg.password, &user.pwhash) {
+        match verify(&msg.0.password, &user.pwhash) {
             Ok(_) => Ok(user),
             Err(BcryptError::InvalidPassword) => {
-                Err(ErrDomain(ErrorDomain::new("Invalid credentials provided.", None)))
+                Err(Error::new("Invalid credentials provided.", 400, None))
             }
             Err(err) => {
                 error!("Error from bcrypt while checking user's password. {:?}", err);
-                Err(ErrSystem(ErrorResponse::new_ise()))
+                Err(Error::new_ise())
             }
         }
+    }
+}
+
+impl Handler<SaveGif> for MongoExecutor {
+    type Result = <SaveGif as Message>::Result;
+
+    /// Handle saving a user's GIF.
+    fn handle(&mut self, msg: SaveGif, _: &mut Self::Context) -> Self::Result {
+        let mut model = SavedGif::from((msg.0, msg.1));
+        match model.save(self.0.clone(), None) {
+            Ok(_) => (),
+            Err(err) => {
+                error!("Error saving user's GIF. {:?}", err);
+                return Err(Error::new_ise());
+            }
+        }
+        Ok(model)
     }
 }

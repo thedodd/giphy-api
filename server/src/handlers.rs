@@ -1,214 +1,231 @@
-use std::sync::Arc;
+use std::collections::HashSet;
 
-use actix::prelude::*;
+use actix_web::{
+    Error as WebError, FromRequest, Json, State,
+    HttpRequest, HttpResponse,
+};
+use common::{
+    Error, GiphyGif, Response, User,
+    LoginRequest, LoginResponse,
+    RegisterRequest, RegisterResponse,
+    SaveGifRequest, SaveGifResponse,
+    SearchGiphyRequest, SearchGiphyResponse,
+};
 use futures::{prelude::*, future::ok};
-use log::{debug, error};
-use prost::Message as ProtoMessage;
-use reqwest::r#async::Client;
+use log::error;
 use serde_derive::{Deserialize, Serialize};
+use wither::mongodb::oid::ObjectId;
 
 use crate::{
-    config::Config,
-    db::{CreateUser, FindUserWithCreds, MongoExecutor},
+    app::AppState, db, models,
     jwt::Claims,
-    models::User,
-    proto::{
-        api::{
-            self, request_frame,
-            RequestFrame, ResponseFrame,
-            RegisterRequest, LoginRequest, SearchGiphyRequest,
-        },
-        api_ext::Error::{self, ErrSystem},
-    },
 };
 
-/// The API endpoint for querying the Giphy API.
-const GIPHY_API_URL: &str = "https://api.giphy.com/v1/gifs/search";
+const GIPHY_SEARCH_URL: &str = "https://api.giphy.com/v1/gifs/search";
+const GIPHY_ID_URL: &str = "https://api.giphy.com/v1/gifs"; // Must append `/{id}`.
 
-/// A request frame which has come in from a connected socket.
-pub struct Request(pub Vec<u8>);
-
-impl Message for Request {
-    type Result = Result<Vec<u8>, ()>;
-}
-
-//////////////////////////////////////////////////////////////////////////////////////////////////
-// SocketHandler /////////////////////////////////////////////////////////////////////////////////
-
-/// An actor used for handling websocket events.
-pub struct SocketHandler {
-    config: Arc<Config>,
-    db: Addr<MongoExecutor>,
-    http: Client,
-}
-
-impl SocketHandler {
-    /// Create a new instance.
-    pub fn new(config: Arc<Config>, db: Addr<MongoExecutor>) -> Self {
-        let http = Client::new();
-        Self{config, db, http}
-    }
-}
-
-impl Actor for SocketHandler {
-    type Context = Context<Self>;
-}
-
-/// Handle binary websocket frames.
-impl Handler<Request> for SocketHandler {
-    type Result = ResponseFuture<Vec<u8>, ()>;
-
-    fn handle(&mut self, msg: Request, _: &mut Context<Self>) -> Self::Result {
-        // Decode received frame.
-        let frame = match RequestFrame::decode(msg.0) {
-            Ok(frame) => frame,
-            Err(err) => {
-                error!("Failed to decode received frame. {:?}", err);
-                let mut buf = vec![];
-                let res = ResponseFrame::error(None, api::ErrorResponse::new_invalid());
-                res.encode(&mut buf).unwrap(); // This will never fail.
-                return Box::new(ok(buf));
+/// Handle registration requests.
+pub fn register(state: State<AppState>, data: Json<RegisterRequest>) -> Box<dyn Future<Item=HttpResponse, Error=WebError>> {
+    // Register the new user.
+    let cfg = state.config.clone();
+    let f = state.db.send(db::CreateUser(data.into_inner()))
+        .then(|res| match res {
+            Ok(inner) => inner,
+            Err(mailbox_err) => {
+                error!("Actix mailbox error. {:?}", mailbox_err);
+                Err(Error::new_ise())
             }
-        };
-        debug!("Message received: {:?}", &frame);
+        })
+        .and_then(move |user: models::User| {
+            // Generate JWT for user & build response.
+            let user_id = user.id.map(|id| id.to_hex()).unwrap_or_default();
+            let jwt = Claims::new(&cfg.raw_idp_private_key, user_id.clone())?;
+            let user = User{id: user_id, email: user.email, jwt};
+            Ok(RegisterResponse(user))
+        })
+        .then(|res| match res {
+            Ok(data) => Ok(Response::Data(data)),
+            Err(err) => Ok(Response::Error(err)),
+        })
+        .map(|res| HttpResponse::Ok().json(res))
+        .map_err(|_: ()| -> WebError { unreachable!() });
 
-        // Route the message to the appropriate handler.
-        use request_frame::Request::{Register, Login, SearchGiphy};
-        let res_future = match frame.request {
-            Some(Register(data)) => self.register(frame.id, data),
-            Some(Login(data)) => self.login(frame.id, data),
-            Some(SearchGiphy(data)) => self.search_giphy(frame.id, data),
-            None => {
-                error!("Unrecognized request variant.");
-                let error = api::ErrorResponse::new_invalid();
-                Box::new(futures::future::ok(ResponseFrame::error(Some(&frame.id), error)))
-            }
-        };
-
-        // Encode the response to be sent back over the socket.
-        Box::new(res_future.map(|frame| {
-            let mut buf = vec![];
-            frame.encode(&mut buf).unwrap(); // This will never fail.
-            buf
-        }))
-    }
+    Box::new(f)
 }
 
-impl SocketHandler {
-    /// Handle registration requests.
-    fn register(&self, rqid: String, data: RegisterRequest) -> Box<dyn Future<Item=ResponseFrame, Error=()>> {
-        // Register the new user.
-        let rqid_copy = rqid.clone();
-        let cfg = self.config.clone();
-        let f = self.db.send(CreateUser{email: data.email, password: data.password})
-            .then(|res| match res {
-                Ok(inner) => inner,
-                Err(mailbox_err) => {
-                    error!("Actix mailbox error. {:?}", mailbox_err);
-                    Err(ErrSystem(api::ErrorResponse::new_ise()))
-                }
-            })
-            .and_then(move |user: User| {
-                // Generate JWT for user & build response.
-                let user_id = user.id.map(|id| id.to_hex()).unwrap_or_default();
-                let jwt = Claims::new(&cfg.raw_idp_private_key, user_id.clone()).map_err(ErrSystem)?;
-                Ok(ResponseFrame::register(rqid, user_id, user.email, jwt))
-            })
-            .then(move |res| match res {
-                Ok(ok) => Ok(ok),
-                Err(err) => match err {
-                    Error::ErrSystem(e) => Ok(ResponseFrame::error(Some(&rqid_copy), e)),
-                    Error::ErrDomain(e) => Ok(ResponseFrame::register_err(rqid_copy, e)),
-                }
-            });
+/// Handle login requests.
+pub fn login(state: State<AppState>, data: Json<LoginRequest>) -> Box<dyn Future<Item=HttpResponse, Error=WebError>> {
+    // Check the provided credentials and log the user in.
+    let cfg = state.config.clone();
+    let f = state.db.send(db::FindUserWithCreds(data.into_inner()))
+        .then(|res| match res {
+            Ok(inner) => inner,
+            Err(mailbox_err) => {
+                error!("Actix mailbox error. {:?}", mailbox_err);
+                Err(Error::new_ise())
+            }
+        })
+        .and_then(move |user: models::User| {
+            // Generate JWT for user & build response.
+            let user_id = user.id.map(|id| id.to_hex()).unwrap_or_default();
+            let jwt = Claims::new(&cfg.raw_idp_private_key, user_id.clone())?;
+            let user = User{id: user_id, email: user.email, jwt};
+            Ok(LoginResponse(user))
+        })
+        .then(|res| match res {
+            Ok(data) => Ok(Response::Data(data)),
+            Err(err) => Ok(Response::Error(err)),
+        })
+        .map(|res| HttpResponse::Ok().json(res))
+        .map_err(|_: ()| -> WebError { unreachable!() });
 
-        Box::new(f)
-    }
+    Box::new(f)
+}
 
-    /// Handle login requests.
-    fn login(&self, rqid: String, data: LoginRequest) -> Box<dyn Future<Item=ResponseFrame, Error=()>> {
-        // Check the provided credentials and log the user in.
-        let rqid_copy = rqid.clone();
-        let cfg = self.config.clone();
-        let f = self.db.send(FindUserWithCreds{email: data.email, password: data.password})
-            .then(|res| match res {
-                Ok(inner) => inner,
-                Err(mailbox_err) => {
-                    error!("Actix mailbox error. {:?}", mailbox_err);
-                    Err(ErrSystem(api::ErrorResponse::new_ise()))
-                }
-            })
-            .and_then(move |user: User| {
-                // Generate JWT for user & build response.
-                let user_id = user.id.map(|id| id.to_hex()).unwrap_or_default();
-                let jwt = Claims::new(&cfg.raw_idp_private_key, user_id.clone()).map_err(ErrSystem)?;
-                Ok(ResponseFrame::login(rqid, user_id, user.email, jwt))
-            })
-            .then(move |res| match res {
-                Ok(ok) => Ok(ok),
-                Err(err) => match err {
-                    Error::ErrSystem(e) => Ok(ResponseFrame::error(Some(&rqid_copy), e)),
-                    Error::ErrDomain(e) => Ok(ResponseFrame::login_err(rqid_copy, e)),
-                }
-            });
+/// Handle search giphy requests.
+pub fn search_giphy(
+    state: State<AppState>, data: Json<SearchGiphyRequest>, jwt: AuthHeader,
+) -> Box<dyn Future<Item=HttpResponse, Error=WebError>> {
+    // FUTURE: in order to provide maximum security over the stateless JWT auth protocol,
+    // we can introduce a nonce value to the user model. If the JWT's nonce (a timestamp)
+    // does not match the user model, then the JWT is invalid.
 
-        Box::new(f)
-    }
+    // Validate the given JWT before processing request.
+    let user_id_res = jwt.0.ok_or(Error::new("Unauthorized. No credentials provided.", 401, None))
+        .map(|jwt| Claims::from_jwt(&jwt, &state.config.raw_idp_public_key)
+            .map(|claims| ObjectId::with_string(&claims.sub).map_err(|_| {
+                error!("Invariant violated. User ID from JWT was not a valid ObjectId.");
+                Error::new_ise()
+            })))
+        .and_then(|inner| inner).and_then(|inner| inner); // Unpack the inner results.
+    let user_id = match user_id_res {
+        Ok(user_id) => user_id,
+        Err(err) => return Box::new(ok(
+            HttpResponse::Ok().json(&Response::<SearchGiphyResponse>::Error(err))
+        )),
+    };
 
-    /// Handle search giphy requests.
-    fn search_giphy(&self, rqid: String, data: SearchGiphyRequest) -> Box<dyn Future<Item=ResponseFrame, Error=()>> {
-        // FUTURE: in order to provide maximum security over the stateless JWT auth protocol,
-        // we can introduce a nonce value to the user model. If the JWT's nonce (a timestamp)
-        // does not match the user model, then the JWT is invalid.
+    // Build future for fetching the user's saved GIFs.
+    let gifs_f = state.db.send(db::FindUserSavedGifs(user_id)).then(|res| match res {
+        Ok(inner) => inner,
+        Err(mailbox_err) => {
+            error!("Actix mailbox error. {:?}", mailbox_err);
+            Err(Error::new_ise())
+        }
+    }).map(|gifs| gifs.into_iter().fold(HashSet::new(), |mut acc, gif| {
+        acc.insert(gif.giphy_id);
+        acc
+    }));
 
-        // Validate the given JWT before processing request.
-        let _claims = match Claims::from_jwt(&data.jwt, &self.config.raw_idp_public_key) {
-            Ok(claims) => claims,
-            Err(err) => return Box::new(ok(ResponseFrame::error(Some(&rqid), err))),
-        };
-
-        // TODO: join this with another future which queries the DB for favorites.
-
-        // Fetch a payload of Gifs from Giphy according to the given search.
-        let (rqid_copy0, rqid_copy1) = (rqid.clone(), rqid.clone());
-        let query_fut = self.http.get(GIPHY_API_URL)
-            .query(&[("api_key", self.config.giphy_api_key.as_str()), ("q", data.query.as_str()), ("limit", "50")])
-
-            // Send the request & do initial error handling.
-            .send()
-            .and_then(|res| res.error_for_status())
+    // Fetch a payload of Gifs from Giphy according to the given search.
+    let query_f = gifs_f.and_then(move |gifs| {
+        state.client.get(GIPHY_SEARCH_URL)
+            .query(&[
+                ("api_key", state.config.giphy_api_key.as_str()),
+                ("q", data.query.as_str()),
+                ("limit", "50"),
+            ]).send().and_then(|res| res.error_for_status())
             .and_then(|mut result| {
-                result.json::<GiphySearchResponse>()
+                result.json::<GiphySearchResponse<Vec<GiphySearchGif>>>()
             })
             .then(move |res| match res {
                 Ok(payload) => {
                     let gifs = payload.data.into_iter().map(|gif| {
-                        api::GiphyGif{
+                        let is_saved = gifs.contains(&gif.id);
+                        GiphyGif{
                             id: gif.id,
                             title: gif.title,
-                            url: gif.images.downsized_medium.url,
-                            is_favorite: false,
+                            url: gif.images.fixed_height_downsampled.url,
+                            is_saved,
                         }
                     }).collect();
-                    Ok(ResponseFrame::search_giphy(rqid_copy0, gifs))
+                    Ok(SearchGiphyResponse{gifs})
                 },
                 Err(err) => {
                     error!("Error from query to the Giphy API. {:?}", err);
-                    Err(api::ErrorResponse::new_ise())
+                    Err(Error::new_ise())
                 }
             })
-            .then(move |res| match res {
-                Ok(ok) => Ok(ok),
-                Err(err) => Ok(ResponseFrame::error(Some(&rqid_copy1), err)),
-            });
+    })
+    .then(|res| match res {
+        Ok(data) => Ok(Response::Data(data)),
+        Err(err) => Ok(Response::Error(err)),
+    })
+    .map(|res| HttpResponse::Ok().json(res))
+    .map_err(|_: ()| -> WebError { unreachable!() });
 
-        Box::new(query_fut)
-    }
+    Box::new(query_f)
+}
+
+/// Handle save GIF requests.
+pub fn save_gif(
+    state: State<AppState>, data: Json<SaveGifRequest>, jwt: AuthHeader,
+) -> Box<dyn Future<Item=HttpResponse, Error=WebError>> {
+    // Validate the given JWT before processing request.
+    let user_id_res = jwt.0.ok_or(Error::new("Unauthorized. No credentials provided.", 401, None))
+        .map(|jwt| Claims::from_jwt(&jwt, &state.config.raw_idp_public_key)
+            .map(|claims| ObjectId::with_string(&claims.sub).map_err(|_| {
+                error!("Invariant violated. User ID from JWT was not a valid ObjectId.");
+                Error::new_ise()
+            })))
+        .and_then(|inner| inner).and_then(|inner| inner); // Unpack the inner results.
+    let user_id = match user_id_res {
+        Ok(user_id) => user_id,
+        Err(err) => return Box::new(ok(
+            HttpResponse::Ok().json(&Response::<SaveGifResponse>::Error(err))
+        )),
+    };
+
+    // Fetch the target GIF from the Giphy API.
+    let data = data.into_inner();
+    let giphy_f = state.client.get(&format!("{}/{}", GIPHY_ID_URL, &data.id))
+        .query(&[("api_key", state.config.giphy_api_key.as_str())]).send()
+        .and_then(|res| res.error_for_status())
+        .and_then(|mut result| {
+            result.json::<GiphySearchResponse<Option<GiphySearchGif>>>()
+        })
+        .then(move |res| match res {
+            Ok(payload) => {
+                match payload.data {
+                    Some(gif) => Ok(GiphyGif{
+                        id: gif.id,
+                        title: gif.title,
+                        url: gif.images.fixed_height_downsampled.url,
+                        is_saved: false,
+                    }),
+                    None => Err(Error::new("Specified GIF does not seem to exist in Gipy.", 400, None)),
+                }
+            },
+            Err(err) => {
+                error!("Error from query to the Giphy API. {:?}", err);
+                Err(Error::new_ise())
+            }
+        });
+
+    // Save the GIF to the DB for the user if we have a successful lookup.
+    let gif_f = giphy_f.and_then(move |gif: GiphyGif| {
+        state.db.send(db::SaveGif(user_id, gif)).then(|res| match res {
+            Ok(inner) => inner,
+            Err(mailbox_err) => {
+                error!("Actix mailbox error. {:?}", mailbox_err);
+                Err(Error::new_ise())
+            }
+        })
+    })
+    .map(|saved_gif| SaveGifResponse{gif: GiphyGif::from(saved_gif)})
+    .then(|res: Result<SaveGifResponse, Error>| match res {
+        Ok(data) => Ok(Response::Data(data)),
+        Err(err) => Ok(Response::Error(err)),
+    })
+    .map(|res| HttpResponse::Ok().json(res))
+    .map_err(|_: ()| -> WebError { unreachable!() });
+
+    Box::new(gif_f)
 }
 
 #[derive(Deserialize, Serialize)]
-struct GiphySearchResponse {
-    pub data: Vec<GiphySearchGif>,
+struct GiphySearchResponse<D> {
+    pub data: D,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -220,11 +237,28 @@ struct GiphySearchGif {
 
 #[derive(Deserialize, Serialize)]
 struct GiphySearchGifImages {
-    pub downsized_medium: GiphySearchGifImagesModel,
+    pub fixed_height_downsampled: GiphySearchGifImagesModel,
 }
 
 #[derive(Deserialize, Serialize)]
 struct GiphySearchGifImagesModel {
     #[serde(alias="mp4")]
     pub url: String,
+}
+
+/// A request extractor for accessing a request's authorization header.
+pub struct AuthHeader(pub Option<String>);
+
+impl FromRequest<AppState> for AuthHeader {
+    type Config = ();
+    type Result = Result<Self, WebError>;
+
+    fn from_request(req: &HttpRequest<AppState>, _cfg: &Self::Config) -> Self::Result {
+        let jwt = req.headers().get("authorization")
+            .map(|h| h.to_str().unwrap_or("")).unwrap_or("").trim_start_matches("bearer ");
+        match jwt.len() > 0 {
+            true => Ok(AuthHeader(Some(jwt.to_string()))),
+            false => Ok(AuthHeader(None)),
+        }
+    }
 }

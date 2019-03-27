@@ -2,7 +2,8 @@ use seed::prelude::*;
 
 use crate::{
     router::Route,
-    state::{Model, ModelEvent, UIStateEvent},
+    state::{Model, ModelEvent},
+    ui::UIStateEvent,
 };
 
 /// The navbar component.
@@ -17,8 +18,8 @@ pub fn navbar(model: &Model) -> El<ModelEvent> {
         navmenu_attrs.add(At::Class, "navbar-menu")
     }
 
+    // FUTURE: nice-to-have: wire up overlay for click-away.
     // TODO: wire up the logout handler.
-    // TODO: wire up overlay for click-away.
 
     nav!(attrs!(At::Class => "Navbar navbar is-black is-fixed-top"),
         div!(attrs!(At::Class => "navbar-brand"),
@@ -33,12 +34,15 @@ pub fn navbar(model: &Model) -> El<ModelEvent> {
 
         div!(navmenu_attrs,
             div!(attrs!(At::Class => "navbar-start"),
-                build_search_link(&model.route),
-                build_favorites_link(&model.route),
+                div!(class!("navbar-item"), build_search_link(&model.route)),
+                div!(class!("navbar-item"), build_favorites_link(&model.route)),
             ),
             div!(attrs!(At::Class => "navbar-end"),
                 div!(attrs!(At::Class => "navbar-item"),
-                    "Email"
+                    button!(class!("button is-dark"),
+                        simple_ev(Ev::Click, ModelEvent::Logout),
+                        "Logout"
+                    )
                 )
             )
         )
@@ -46,7 +50,7 @@ pub fn navbar(model: &Model) -> El<ModelEvent> {
 }
 
 fn build_search_link(route: &Route) -> El<ModelEvent> {
-    let mut attrs = attrs!(At::Class => "navbar-item"; At::Href => "/ui/search");
+    let mut attrs = attrs!(At::Class => "button is-dark"; At::Href => "/ui/search");
     if let Route::Search = route {
         attrs.add(At::Disabled, "true");
     }
@@ -54,7 +58,7 @@ fn build_search_link(route: &Route) -> El<ModelEvent> {
 }
 
 fn build_favorites_link(route: &Route) -> El<ModelEvent> {
-    let mut attrs = attrs!(At::Class => "navbar-item"; At::Href => "/ui/favorites");
+    let mut attrs = attrs!(At::Class => "button is-dark"; At::Href => "/ui/favorites");
     if let Route::Favorites = route {
         attrs.add(At::Disabled, "true");
     }

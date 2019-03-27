@@ -1,25 +1,30 @@
 use std::borrow::Cow;
 
+use common::{
+    Error, User,
+    LoginRequest, LoginResponse,
+    RegisterRequest, RegisterResponse,
+};
+use futures::prelude::*;
 use seed::prelude::*;
 use validator::{validate_email};
 
 use crate::{
-    net::NetworkEvent,
-    proto::api::{LoginResponse, RegisterResponse, RequestFrame},
+    api,
     router::Route,
-    state::{
-        set_session_item,
-        Model, ModelEvent, User,
-    },
+    state::{Model, ModelEvent},
+    utils::{set_session_item}
 };
 
 /// The state of the login container.
-#[derive(Clone, Default)]
+#[derive(Default)]
 pub struct LoginContainer {
     pub email: String,
     pub email_error: Option<Cow<'static, str>>,
     pub pw: String,
     pub pw_error: Option<Cow<'static, str>>,
+    pub network_error: Option<String>,
+    pub has_network_request: bool,
 }
 
 impl LoginContainer {
@@ -29,6 +34,8 @@ impl LoginContainer {
         self.email_error = None;
         self.pw = String::from("");
         self.pw_error = None;
+        self.network_error = None;
+        self.has_network_request = false;
     }
 }
 
@@ -38,9 +45,11 @@ pub enum LoginContainerEvent {
     UpdateEmailField(String),
     UpdatePWField(String),
     Login,
-    LoginResponse(LoginResponse),
+    LoginSuccess(LoginResponse),
+    LoginError(Error),
     Register,
-    RegisterResponse(RegisterResponse),
+    RegisterSuccess(RegisterResponse),
+    RegisterError(Error),
 }
 
 impl LoginContainerEvent {
@@ -64,20 +73,30 @@ impl LoginContainerEvent {
                 Render.into()
             }
             LoginContainerEvent::Login => {
-                let req = RequestFrame::login(model.login.email.clone(), model.login.pw.clone());
-                Update::with_msg(ModelEvent::Network(NetworkEvent::SendRequest(req)))
-            }
-            LoginContainerEvent::LoginResponse(res) => {
-                Self::handle_creds_response(User{id: res.id, email: res.email, jwt: res.jwt}, model)
+                model.login.has_network_request = true;
+                let payload = LoginRequest{email: model.login.email.clone(), password: model.login.pw.clone()};
+                Update::with_future_msg(api::login(payload)
+                    .map(|r| ModelEvent::Login(LoginContainerEvent::LoginSuccess(r)))
+                    .map_err(|e| ModelEvent::Login(LoginContainerEvent::LoginError(e))))
             }
             LoginContainerEvent::Register => {
-                let req = RequestFrame::register(model.login.email.clone(), model.login.pw.clone());
-                Update::with_msg(ModelEvent::Network(NetworkEvent::SendRequest(req)))
+                model.login.has_network_request = true;
+                let payload = RegisterRequest{email: model.login.email.clone(), password: model.login.pw.clone()};
+                Update::with_future_msg(api::register(payload)
+                    .map(|r| ModelEvent::Login(LoginContainerEvent::RegisterSuccess(r)))
+                    .map_err(|e| ModelEvent::Login(LoginContainerEvent::RegisterError(e))))
             }
-            LoginContainerEvent::RegisterResponse(res) => {
-                Self::handle_creds_response(User{id: res.id, email: res.email, jwt: res.jwt}, model)
-            }
+            LoginContainerEvent::LoginSuccess(res) => Self::handle_creds_response(res.0, model),
+            LoginContainerEvent::RegisterSuccess(res) => Self::handle_creds_response(res.0, model),
+            LoginContainerEvent::LoginError(err) => Self::handle_error(err, model),
+            LoginContainerEvent::RegisterError(err) => Self::handle_error(err, model),
         }
+    }
+
+    fn handle_error(err: Error, mut model: &mut Model) -> Update<ModelEvent> {
+        model.login.has_network_request = false;
+        model.login.network_error = Some(err.description);
+        Render.into()
     }
 
     fn handle_creds_response(user: User, mut model: &mut Model) -> Update<ModelEvent> {

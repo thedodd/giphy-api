@@ -1,20 +1,28 @@
+use std::collections::{BTreeMap, HashSet};
+
+use common::{
+    Error, GiphyGif,
+    SaveGifRequest, SaveGifResponse,
+    SearchGiphyRequest, SearchGiphyResponse,
+};
+use futures::prelude::*;
 use seed::prelude::*;
 
 use crate::{
-    net::NetworkEvent,
-    proto::api::{self, RequestFrame, SearchGiphyResponse},
-    state::{
-        Model, ModelEvent,
-    },
+    api,
+    components::gifcard,
+    state::{Model, ModelEvent},
+    utils::handle_common_errors,
 };
 
 /// The state of the search container.
-#[derive(Clone, Default)]
+#[derive(Default)]
 pub struct SearchContainer {
     pub search: String,
     pub search_error: Option<String>,
-    pub search_results: Vec<api::GiphyGif>,
-    pub is_awaiting_response: bool,
+    pub search_results: BTreeMap<String, GiphyGif>,
+    pub has_search_request: bool,
+    pub gifs_being_saved: HashSet<String>,
 }
 
 impl SearchContainer {
@@ -23,7 +31,8 @@ impl SearchContainer {
         self.search = String::from("");
         self.search_error = None;
         self.search_results.clear();
-        self.is_awaiting_response = false;
+        self.has_search_request = false;
+        self.gifs_being_saved.clear();
     }
 }
 
@@ -32,7 +41,11 @@ impl SearchContainer {
 pub enum SearchContainerEvent {
     UpdateSearchField(String),
     SubmitSearch,
-    SearchResponse(SearchGiphyResponse),
+    SearchSuccess(SearchGiphyResponse),
+    SearchError(Error),
+    SaveGif(String),
+    SaveGifSuccess(SaveGifResponse),
+    SaveGifError((String, Error)),
 }
 
 impl SearchContainerEvent {
@@ -47,20 +60,44 @@ impl SearchContainerEvent {
                 Some(user) => {
                     model.search.search_error = None;
                     model.search.search_results.clear();
-                    model.search.is_awaiting_response = true;
-                    Update::with_msg(ModelEvent::Network(NetworkEvent::SendRequest(
-                        RequestFrame::search_giphy(model.search.search.clone(), user.jwt.clone())
-                    )))
+                    model.search.has_search_request = true;
+                    let payload = SearchGiphyRequest{query: model.search.search.clone()};
+                    Update::with_future_msg(api::search(payload, user.jwt.clone())
+                        .map(|r| ModelEvent::Search(SearchContainerEvent::SearchSuccess(r)))
+                        .map_err(|e| ModelEvent::Search(SearchContainerEvent::SearchError(e))))
                 }
-                None => Skip.into()
+                None => Update::with_msg(ModelEvent::Logout),
             }
-            SearchContainerEvent::SearchResponse(mut res) => {
-                model.search.is_awaiting_response = false;
-                match res.error {
-                    Some(err) => { model.search.search_error = Some(err.description); }
-                    None => { model.search.search_results.append(&mut res.gifs); }
-                }
+            SearchContainerEvent::SearchSuccess(res) => {
+                model.search.has_search_request = false;
+                res.gifs.into_iter().for_each(|gif| { model.search.search_results.insert(gif.id.clone(), gif); });
                 Render.into()
+            }
+            SearchContainerEvent::SearchError(err) => {
+                model.search.has_search_request = false;
+                handle_common_errors(&err).unwrap_or_else(|| {
+                    model.search.search_error = Some(err.description);
+                    Render.into()
+                })
+            }
+            SearchContainerEvent::SaveGif(gifid) => match &model.user {
+                Some(user) => {
+                    model.search.gifs_being_saved.insert(gifid.clone());
+                    let req = SaveGifRequest{id: gifid};
+                    Update::with_future_msg(api::save_gif(req, user.jwt.clone())
+                        .map(|r| ModelEvent::Search(SearchContainerEvent::SaveGifSuccess(r)))
+                        .map_err(|e| ModelEvent::Search(SearchContainerEvent::SaveGifError(e))))
+                }
+                None => Update::with_msg(ModelEvent::Logout),
+            }
+            SearchContainerEvent::SaveGifSuccess(res) => {
+                model.search.gifs_being_saved.remove(&res.gif.id);
+                model.search.search_results.insert(res.gif.id.clone(), res.gif);
+                Render.into()
+            }
+            SearchContainerEvent::SaveGifError((id, err)) => {
+                model.search.gifs_being_saved.remove(&id);
+                handle_common_errors(&err).unwrap_or(Skip.into())
             }
         }
     }
@@ -72,14 +109,13 @@ pub fn search(model: &Model) -> El<ModelEvent> {
         At::Value => model.search.search; At::Class => "input"; At::PlaceHolder => "Search for GIFs";
     };
     let mut submit_button_attrs = attrs!{At::Class => "button"};
-    if model.search.is_awaiting_response {
+    if model.search.has_search_request {
         search_input_attrs.add(At::Disabled, "true");
         submit_button_attrs.add(At::Disabled, "true");
     }
-    if !model.search.is_awaiting_response && model.search.search.len() == 0 {
+    if !model.search.has_search_request && model.search.search.len() == 0 {
         submit_button_attrs.add(At::Disabled, "true");
     }
-
 
     div!(attrs!{"class" => "Search hero-body"},
         div!(attrs!{"class" => "container"},
@@ -105,31 +141,17 @@ pub fn search(model: &Model) -> El<ModelEvent> {
                                 )
                             )
                         ),
-                        p!(class!("help is-size-6"), "Enter a search query, term, or phrase to get started.")
+                        p!(class!("help is-size-6"), "Enter a search query, term, or phrase to get started."),
+                        p!(class!("help is-size-6 has-text-weight-semibold has-text-danger"), model.search.search_error.as_ref().map(|v| v.as_str()).unwrap_or(" "))
                     )
                 )
             ),
 
             // Search results will go here.
-            div!(class!("columns is-mobile is-multiline Search-images"),
-                model.search.search_results.iter().map(|gif| {
-                    div!(class!("column is-half-mobile is-one-quarter-desktop"),
-                        div!(class!("box"),
-                            div!(class!("media"),
-                                div!(class!("media-center"),
-                                    div!(class!("content"),
-
-                                        figure!(class!("image"),
-                                            img!(attrs!("src" => &gif.url))
-                                        ),
-                                        p!(&gif.title)
-
-                                    )
-                                )
-                            )
-                        )
-                    )
-                }).collect::<Vec<_>>()
+            div!(class!("columns is-1 is-mobile is-multiline Search-images"),
+                model.search.search_results.values().map(|gif|
+                    gifcard(&gif, |id| ModelEvent::Search(SearchContainerEvent::SaveGif(id)))
+                ).collect::<Vec<_>>()
             )
         )
     )
