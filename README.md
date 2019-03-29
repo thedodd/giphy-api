@@ -48,8 +48,8 @@ openssl rsa -in /tmp/keypair.pem -pubout -out /tmp/public.key
 ----
 
 ### demo images mobile
-<img style="max-height:350px" src=".demo-images/0-login.png"/>
-<img style="max-height:350px" src=".demo-images/1-search.png"/>
-<img style="max-height:350px" src=".demo-images/2-navbar.png"/>
-<img style="max-height:350px" src=".demo-images/3-search-results.png"/>
-<img style="max-height:350px" src=".demo-images/4-favorites-and-categorization.png"/>
+<img height="300px" src=".demo-images/0-login.png"/>
+<img height="300px" src=".demo-images/1-search.png"/>
+<img height="300px" src=".demo-images/2-navbar.png"/>
+<img height="300px" src=".demo-images/3-search-results.png"/>
+<img height="300px" src=".demo-images/4-favorites-and-categorization.png"/>
