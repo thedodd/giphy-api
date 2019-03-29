@@ -24,6 +24,24 @@
     min-width: 3rem;
 }
 
+.Favorites {
+    margin-top: 1rem;
+}
+
+.Favorites-field-container {
+    max-width: 600px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.Favorites .Favorites-images .image {
+    margin: 0 !important;
+}
+
+.Favorites .Favorites-images .box .media {
+    min-width: 3rem;
+}
+
 /************************************************************************************************
 * Components ************************************************************************************
 *************************************************************************************************/
@@ -45,6 +63,10 @@
 
 .mb-half {
     margin-bottom: 0.5rem !important;
+}
+
+.ml-1 {
+    margin-left: 1rem !important;
 }
 
 /* Padding */

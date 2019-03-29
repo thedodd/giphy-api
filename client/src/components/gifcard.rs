@@ -6,7 +6,12 @@ use crate::{
 };
 
 /// A card displaying information on a Giphy GIF.
-pub fn gifcard(gif: &GiphyGif, mut on_save: impl FnMut(String) -> ModelEvent + 'static) -> El<ModelEvent> {
+pub fn gifcard(
+    gif: &GiphyGif,
+    mut on_save: impl FnMut(String) -> ModelEvent + 'static,
+    mut on_remove: impl FnMut(String) -> ModelEvent + 'static,
+    mut on_categorize: impl FnMut(String, String) -> ModelEvent + 'static,
+) -> El<ModelEvent> {
     let icon = match gif.is_saved {
         true => span!(class!("icon is-size-6 has-text-warning"), i!(attrs!(At::Class => "fas fa-star"))),
         false => p!(class!("icon is-size-6 has-text-warning"), i!(attrs!(At::Class => "far fa-star"))),

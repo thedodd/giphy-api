@@ -1,6 +1,7 @@
-# TODO:
-# - add notes on: `cargo make --no-workspace ...` to make this work intuitively.
-# - ensure wasm32-unknown-unknown is installed.
+# TODO: ensure wasm32-unknown-unknown is installed in container.
+
+##################################################################################################
+# Client Tasks ###################################################################################
 
 [tasks.client-build]
 workspace = false
@@ -21,6 +22,13 @@ cp ./client/index.html ./static
 cp ./client/index.css ./static
 ''']
 
+[tasks.client-flow]
+workspace = false
+dependencies = ["client-build", "client-bindgen", "client-static"]
+
+##################################################################################################
+# Server Tasks ###################################################################################
+
 [tasks.server-build]
 workspace = false
 command = "cargo"
@@ -35,9 +43,8 @@ dependencies = [
     "server-build",
 ]
 
-[tasks.client-flow]
-workspace = false
-dependencies = ["client-build", "client-bindgen", "client-static"]
+##################################################################################################
+# Watcher Tasks ##################################################################################
 
 [tasks.watch-client]
 workspace = false
@@ -48,3 +55,13 @@ args = ["watch", "-w", "client", "-i", "client/src/proto/*", "-s", "cargo make c
 workspace = false
 command = "cargo"
 args = ["watch", "-w", "server", "-i", "server/src/proto/*", "-s", "cargo run -p server --release"]
+
+##################################################################################################
+# Clean Tasks ####################################################################################
+
+[tasks.clean-static]
+workspace = false
+script_runner = "@shell"
+script = ['''
+rm -r ./static/*
+''']

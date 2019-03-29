@@ -1,7 +1,8 @@
-use seed::Url;
+use seed::{prelude::*, Url};
 
 use crate::{
     ModelEvent,
+    containers::FavoritesEvent,
 };
 
 /// The application's routes.
@@ -29,6 +30,14 @@ impl Route {
             Route::Login => seed::push_path(vec!["ui", "login"]),
             Route::Search => seed::push_path(vec!["ui", "search"]),
             Route::Favorites => seed::push_path(vec!["ui", "favorites"]),
+        }
+    }
+
+    /// Perform any post-routing actions.
+    pub fn post_routing(&self) -> Option<Update<ModelEvent>> {
+        match self {
+            Route::Favorites => Some(Update::with_msg(ModelEvent::Favorites(FavoritesEvent::Fetch))),
+            _ => None,
         }
     }
 }

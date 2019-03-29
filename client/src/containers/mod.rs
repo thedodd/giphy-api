@@ -1,6 +1,9 @@
 mod app;
 pub use app::app;
 
+mod favorites;
+pub use favorites::{Favorites, FavoritesEvent, favorites};
+
 mod login;
 pub use login::{LoginContainer, LoginContainerEvent, login};
 

@@ -43,6 +43,7 @@ pub fn new_app(db: Addr<MongoExecutor>, client: Client, config: Arc<Config>) -> 
                     .resource("/login", |r| r.method(Method::POST).with(handlers::login))
                     .resource("/search_giphy", |r| r.method(Method::POST).with(handlers::search_giphy))
                     .resource("/save_gif", |r| r.method(Method::POST).with(handlers::save_gif))
+                    .resource("/favorites", |r| r.method(Method::POST).with(handlers::favorites))
             })
 
             // Build static file handler.

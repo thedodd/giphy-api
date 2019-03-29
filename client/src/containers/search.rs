@@ -92,7 +92,8 @@ impl SearchContainerEvent {
             }
             SearchContainerEvent::SaveGifSuccess(res) => {
                 model.search.gifs_being_saved.remove(&res.gif.id);
-                model.search.search_results.insert(res.gif.id.clone(), res.gif);
+                model.search.search_results.insert(res.gif.id.clone(), res.gif.clone());
+                model.favorites.favorites.insert(res.gif.id.clone(), res.gif);
                 Render.into()
             }
             SearchContainerEvent::SaveGifError((id, err)) => {
@@ -109,17 +110,22 @@ pub fn search(model: &Model) -> El<ModelEvent> {
         At::Value => model.search.search; At::Class => "input"; At::PlaceHolder => "Search for GIFs";
     };
     let mut submit_button_attrs = attrs!{At::Class => "button"};
-    if model.search.has_search_request {
+    let is_searching = model.search.has_search_request;
+    if is_searching {
         search_input_attrs.add(At::Disabled, "true");
         submit_button_attrs.add(At::Disabled, "true");
     }
-    if !model.search.has_search_request && model.search.search.len() == 0 {
+    if !is_searching && model.search.search.len() == 0 {
         submit_button_attrs.add(At::Disabled, "true");
     }
+    let spinner: El<ModelEvent> = match is_searching {
+        true => span!(class!("icon ml-1"), i!(attrs!(At::Class => "fas fa-spinner fa-pulse"))),
+        false => b!(""),
+    };
 
-    div!(attrs!{"class" => "Search hero-body"},
+    div!(attrs!{At::Class => "Search hero-body"; At::Id => "search"},
         div!(attrs!{"class" => "container"},
-            h1!(attrs!{"class" => "title has-text-centered"}, "Search"),
+            h1!(attrs!{"class" => "title has-text-centered"}, "Search", spinner),
             div!(attrs!{"class" => "field is-horizontal Search-field-container"},
                 div!(attrs!{"class" => "field-body"},
                     div!(attrs!{"class" => "field is-expanded"},
@@ -150,7 +156,11 @@ pub fn search(model: &Model) -> El<ModelEvent> {
             // Search results will go here.
             div!(class!("columns is-1 is-mobile is-multiline Search-images"),
                 model.search.search_results.values().map(|gif|
-                    gifcard(&gif, |id| ModelEvent::Search(SearchContainerEvent::SaveGif(id)))
+                    gifcard(&gif,
+                        move |id| ModelEvent::Search(SearchContainerEvent::SaveGif(id)),
+                        move |_id| ModelEvent::Noop,
+                        move |_id, _cat| ModelEvent::Noop,
+                    )
                 ).collect::<Vec<_>>()
             )
         )

@@ -61,6 +61,11 @@ pub struct GiphyGif {
 
     /// A bool indicating if the calling user has already saved this GIF.
     pub is_saved: bool,
+
+    /// The optional category for this GIF.
+    ///
+    /// NB: This does not come from Giphy, this comes from our DB.
+    pub category: Option<String>,
 }
 
 /// A user of the system.
@@ -129,4 +134,14 @@ pub struct SaveGifRequest {
 pub struct SaveGifResponse {
     /// The saved GIF.
     pub gif: GiphyGif,
+}
+
+/// A request to fetch the caller's saved GIFs.
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct FetchFavoritesRequest;
+
+/// The response to a request to fetch the caller's saved GIFs.
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct FetchFavoritesResponse {
+    pub gifs: Vec<GiphyGif>,
 }

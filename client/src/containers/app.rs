@@ -2,7 +2,7 @@ use seed::prelude::*;
 
 use crate::{
     components::navbar,
-    containers::{login, search},
+    containers::{favorites, login, search},
     router::Route,
     state::{Model, ModelEvent},
 };
@@ -22,7 +22,7 @@ pub fn app(model: &Model) -> El<ModelEvent> {
             Route::Init => div!(),
             Route::Login => login(model),
             Route::Search => search(model),
-            Route::Favorites => div!(),
+            Route::Favorites => favorites(model),
         }
     )
 }

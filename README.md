@@ -5,7 +5,7 @@ Design and implement a web application that allows a user to search for and save
 **Requirements:**
 - [x] Provide users with the ability to register and login to your application.
 - [x] As well as the ability to search for animated GIFs from the GIPHY API.
-- [ ] As well as the ability to save and view their favorite GIFs to their profile.
+- [x] As well as the ability to save and view their favorite GIFs to their profile.
 - [ ] Also provide the user with the ability to categorize these saved GIFs (ex: funny, animals, etc.).
 - [x] User data should be stored in a database.
 - [x] Basic application security practices should be implemented (OWASP Top 9).

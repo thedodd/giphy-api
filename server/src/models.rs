@@ -32,19 +32,22 @@ pub struct SavedGif {
 
     /// The URL of the GIF.
     pub url: String,
+
+    /// The category given to this GIF by the user.
+    pub category: Option<String>,
 }
 
 impl From<(ObjectId, GiphyGif)> for SavedGif {
     /// Perform the conversion.
     fn from((user, gif): (ObjectId, GiphyGif)) -> Self {
-        Self{id: None, user, giphy_id: gif.id, title: gif.title, url: gif.url}
+        Self{id: None, user, giphy_id: gif.id, title: gif.title, url: gif.url, category: None}
     }
 }
 
 impl From<SavedGif> for GiphyGif {
     /// Perform the conversion.
     fn from(gif: SavedGif) -> Self {
-        Self{id: gif.giphy_id, title: gif.title, url: gif.url, is_saved: true}
+        Self{id: gif.giphy_id, title: gif.title, url: gif.url, is_saved: true, category: gif.category}
     }
 }
 
