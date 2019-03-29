@@ -118,46 +118,46 @@ pub fn login(model: &Model) -> El<ModelEvent> {
         false => attrs!{At::Class => "button is-dark is-outlined"; At::Disabled => true},
     };
 
-    div!(attrs!{"class" => "hero-body Login"},
-        div!(attrs!{"class" => "container"},
-            h1!(attrs!{"class" => "title has-text-centered"}, "GIPHY Client"),
-            h5!(attrs!{"class" => "subtitle has-text-centered"}, "G-rated"),
+    div!(attrs!{At::Class => "hero-body Login"},
+        div!(attrs!{At::Class => "container"},
+            h1!(attrs!{At::Class => "title has-text-centered"}, "GIPHY Client"),
+            h5!(attrs!{At::Class => "subtitle has-text-centered"}, "G-rated"),
 
             // Login / registration form.
-            div!(attrs!{"class" => "columns"},
-                div!(attrs!{"class" => "column"},
-                    div!(attrs!{"class" => "field"},
-                        p!(attrs!{"class" => "control has-icons-left has-icons-right"},
+            div!(attrs!{At::Class => "columns"},
+                div!(attrs!{At::Class => "column"},
+                    div!(attrs!{At::Class => "field"},
+                        p!(attrs!{At::Class => "control has-icons-left has-icons-right"},
                             input!(
-                                attrs!{At::Value => model.login.email; "class" => "input"; "type" => "email"; "placeholder" => "Email";},
+                                attrs!{At::Value => model.login.email; At::Class => "input"; "type" => "email"; "placeholder" => "Email";},
                                 input_ev(Ev::Input, |val| ModelEvent::Login(LoginContainerEvent::UpdateEmailField(val))),
                             ),
-                            span!(attrs!{"class" => "icon is-small is-left"},
-                                i!(attrs!{"class" => "fas fa-envelope"}),
+                            span!(attrs!{At::Class => "icon is-small is-left"},
+                                i!(attrs!{At::Class => "fas fa-envelope"}),
                             ),
                         ),
                     ),
-                    div!(attrs!{"class" => "field"},
-                        p!(attrs!{"class" => "control has-icons-left"},
+                    div!(attrs!{At::Class => "field"},
+                        p!(attrs!{At::Class => "control has-icons-left"},
                             input!(
                                 attrs!{At::Value => model.login.pw; At::Class => "input"; "type" => "password"; "placeholder" => "Password";},
                                 input_ev(Ev::Input, |val| ModelEvent::Login(LoginContainerEvent::UpdatePWField(val))),
                             ),
-                            span!(attrs!{"class" => "icon is-small is-left"},
-                                i!(attrs!{"class" => "fas fa-lock"}),
+                            span!(attrs!{At::Class => "icon is-small is-left"},
+                                i!(attrs!{At::Class => "fas fa-lock"}),
                             ),
                         ),
                     ),
-                    div!(attrs!{"class" => "field"},
-                        div!(attrs!{"class" => "columns is-mobile"},
-                            div!(attrs!{"class" => "column is-narrow"},
+                    div!(attrs!{At::Class => "field"},
+                        div!(attrs!{At::Class => "columns is-mobile"},
+                            div!(attrs!{At::Class => "column is-narrow"},
                                 button!(
                                     &button_attrs,
                                     simple_ev(Ev::Click, ModelEvent::Login(LoginContainerEvent::Login)),
                                     "Login"
                                 )
                             ),
-                            div!(attrs!{"class" => "column is-narrow"},
+                            div!(attrs!{At::Class => "column is-narrow"},
                                 button!(
                                     &button_attrs,
                                     simple_ev(Ev::Click, ModelEvent::Login(LoginContainerEvent::Register)),
@@ -168,7 +168,7 @@ pub fn login(model: &Model) -> El<ModelEvent> {
                     )
                 )
             ),
-            p!(attrs!{"class" => "control"},
+            p!(attrs!{At::Class => "control"},
                 model.login.email_error.as_ref()
                     .or(model.login.pw_error.as_ref())
                     .unwrap_or(&Cow::Borrowed(" "))) // Is a &NBSP;

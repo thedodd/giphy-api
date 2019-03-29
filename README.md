@@ -6,42 +6,45 @@ Design and implement a web application that allows a user to search for and save
 - [x] Provide users with the ability to register and login to your application.
 - [x] As well as the ability to search for animated GIFs from the GIPHY API.
 - [x] As well as the ability to save and view their favorite GIFs to their profile.
-- [ ] Also provide the user with the ability to categorize these saved GIFs (ex: funny, animals, etc.).
+- [x] Also provide the user with the ability to categorize these saved GIFs (ex: funny, animals, etc.).
 - [x] User data should be stored in a database.
 - [x] Basic application security practices should be implemented (OWASP Top 9).
 - [x] GIFs available on your application should be limited to a G-Rating.
+
+**Bonus:**
+- [x] filter saved gifs by their category.
 
 **NB:** items marked as `// FUTURE:` are simply items which I've skipped over in the name of brevity, but which we would normally want to finish implementing before deploying.
 
 ### overview
 #### api
-The API is implemented as a [Protocol Buffers](https://developers.google.com/protocol-buffers/docs/overview) based Websockets API.
+The API is structured as a very simple old school REST API written in Rust. The client & server use the same exact data models for communicating over the network. All interaction is protected by JWT authN/authZ.
 
-All interaction with this API is performed over Websockets and must adhere to the protocol outlined in the API's main protobuf file.
+#### client app
+The client app is a WebAssembly (WASM) application built using Rust.
 
-### getting started
-We are using MongoDB as the backend for this system. First, ensure you have [docker](https://docs.docker.com/install/#supported-platforms) & [docker compose](https://docs.docker.com/compose/install/) installed on your system.
+#### database
+We are using MongoDB as the backend for this system. We are using an ODM, called [Wither](https://github.com/thedodd/wither), which I created. This allows us to deal with our MongoDB collections in a model-first fashion.
+
+#### setup
+First, ensure you have [docker](https://docs.docker.com/install/#supported-platforms) & [docker compose](https://docs.docker.com/compose/install/) installed on your system. Everything in this system is intended to run entirely within docker.
 
 ```bash
-# Next, from the root of this repository, boot up the MongoDB instance.
-docker-compose up -d mongo
+# Boot the entire system.
+docker-compose up -d
 
-# You can check its logs to ensure everything came up properly.
-docker-compose logs -f mongo
+# Stream the logs to ensure everything has come online as needed.
+docker-compose logs -f
 
 # You can access the MongoDB instance via the following command.
 docker-compose exec mongo mongo
 ```
 
+Now you're ready to start using the app. Simply navigate to http://localhost:8080 to get started.
 
+----
 
-
-
-
-
-
-
-
+### deep dive
 ##### auth
 We are using `2048` bit RSA asymmetric keys for creating and verifying our JWTs. The code block below shows how to create a new key pair. The keys must be base64 encoded before being passed into the container runtime environment.
 ```bash

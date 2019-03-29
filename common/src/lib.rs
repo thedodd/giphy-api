@@ -145,3 +145,19 @@ pub struct FetchFavoritesRequest;
 pub struct FetchFavoritesResponse {
     pub gifs: Vec<GiphyGif>,
 }
+
+/// A request to categorize a GIF.
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct CategorizeGifRequest {
+    /// The ID of the GIF to update.
+    pub id: String,
+
+    /// The new category to apply.
+    pub category: String,
+}
+
+/// The response to a request to categorize a GIF.
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct CategorizeGifResponse {
+    pub gif: GiphyGif,
+}

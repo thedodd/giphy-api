@@ -1,7 +1,10 @@
-use std::collections::BTreeMap;
+use std::collections::{
+    BTreeMap, HashMap, HashSet,
+};
 
 use common::{
     Error, GiphyGif,
+    CategorizeGifRequest, CategorizeGifResponse,
     FetchFavoritesRequest, FetchFavoritesResponse,
 };
 use futures::prelude::*;
@@ -18,6 +21,8 @@ use crate::{
 #[derive(Default)]
 pub struct Favorites {
     pub favorites: BTreeMap<String, GiphyGif>,
+    pub category_updates: HashMap<String, String>,
+    pub saving_category: HashSet<String>,
     pub fetch_error: Option<Error>,
     pub is_fetching_favorites: bool,
     pub filter: String,
@@ -27,6 +32,8 @@ impl Favorites {
     /// Revert this model back to a pristine state.
     pub fn pristine(&mut self) {
         self.favorites.clear();
+        self.category_updates.clear();
+        self.saving_category.clear();
         self.fetch_error = None;
         self.is_fetching_favorites = false;
         self.filter = String::new();
@@ -39,10 +46,11 @@ pub enum FavoritesEvent {
     Fetch,
     FetchSuccess(FetchFavoritesResponse),
     FetchError(Error),
-    Categorize(String, String),
-    CategorizeSuccess(GiphyGif),
+    Categorize(String),
+    CategorizeSuccess(CategorizeGifResponse),
     CategorizeError(String, Error),
     UpdateFilter(String),
+    UpdateCategory(String, String),
 }
 
 impl FavoritesEvent {
@@ -68,10 +76,42 @@ impl FavoritesEvent {
                 model.favorites.fetch_error = Some(err.clone());
                 handle_common_errors(&err).unwrap_or(Render.into())
             }
-            FavoritesEvent::Categorize(_id, _catg) => Skip.into(),
-            FavoritesEvent::CategorizeSuccess(_gif) => Skip.into(),
-            FavoritesEvent::CategorizeError(_id, _err) => Skip.into(),
-            FavoritesEvent::UpdateFilter(_filter) => Skip.into(),
+            FavoritesEvent::Categorize(id) => match &model.user {
+                Some(user) => match model.favorites.category_updates.get(&id) {
+                    Some(category) => {
+                        model.favorites.saving_category.insert(id.clone());
+                        let payload = CategorizeGifRequest{id: id.clone(), category: category.to_string()};
+                        Update::with_future_msg(api::categorize(payload, user.jwt.clone())
+                            .map(|r| ModelEvent::Favorites(FavoritesEvent::CategorizeSuccess(r)))
+                            .map_err(|(id, e)| ModelEvent::Favorites(FavoritesEvent::CategorizeError(id, e))))
+                    }
+                    None => Skip.into()
+                }
+                None => Update::with_msg(ModelEvent::Logout),
+            },
+            FavoritesEvent::CategorizeSuccess(res) => {
+                let gif = res.gif;
+                model.favorites.saving_category.remove(&gif.id);
+                model.favorites.category_updates.remove(&gif.id);
+                model.favorites.favorites.insert(gif.id.clone(), gif);
+                Render.into()
+            }
+            FavoritesEvent::CategorizeError(id, err) => {
+                log!(format!("Error while saving category. {:?}", &err));
+                model.favorites.saving_category.remove(&id);
+                Render.into()
+            }
+            FavoritesEvent::UpdateFilter(filter) => {
+                model.favorites.filter = filter;
+                Render.into()
+            }
+            FavoritesEvent::UpdateCategory(id, val) => {
+                match val.len() > 0 {
+                    true => model.favorites.category_updates.insert(id, val),
+                    false => model.favorites.category_updates.remove(&id),
+                };
+                Render.into()
+            }
         }
     }
 }
@@ -84,23 +124,23 @@ pub fn favorites(model: &Model) -> El<ModelEvent> {
     };
 
     div!(attrs!{At::Class => "Favorites hero-body"; At::Id => "favorites"},
-        div!(attrs!{"class" => "container"},
-            h1!(attrs!{"class" => "title has-text-centered"}, "Favorites", spinner),
-            div!(attrs!{"class" => "field is-horizontal Favorites-field-container"},
-                div!(attrs!{"class" => "field-body"},
-                    div!(attrs!{"class" => "field is-expanded"},
-                        div!(attrs!{"class" => "field has-addons"},
-                            p!(attrs!{"class" => "control"},
+        div!(attrs!{At::Class => "container"},
+            h1!(attrs!{At::Class => "title has-text-centered"}, "Favorites", spinner),
+            div!(attrs!{At::Class => "field is-horizontal Favorites-field-container"},
+                div!(attrs!{At::Class => "field-body"},
+                    div!(attrs!{At::Class => "field is-expanded"},
+                        div!(attrs!{At::Class => "field has-addons"},
+                            p!(attrs!{At::Class => "control"},
                                 // NB: due to a rendering bug in this framework, we need to be
                                 // sure that this `button!` element type is different than the
                                 // element type on the search page.
-                                button!(attrs!{"class" => "button is-static"},
-                                    i!(attrs!{"class" => "fas fa-filter"}),
+                                button!(attrs!{At::Class => "button is-static"},
+                                    i!(attrs!{At::Class => "fas fa-filter"}),
                                 ),
                             ),
-                            p!(attrs!{"class" => "control is-expanded"},
+                            p!(attrs!{At::Class => "control is-expanded"},
                                 input!(
-                                    attrs!{At::Value => model.favorites.filter; At::Class => "input"; At::PlaceHolder => "Filter by category"},
+                                    attrs!(At::Value => model.favorites.filter; At::Class => "input"; At::PlaceHolder => "Filter by category"),
                                     input_ev(Ev::Input, |val| ModelEvent::Favorites(FavoritesEvent::UpdateFilter(val))),
                                 ),
                             ),
@@ -113,13 +153,21 @@ pub fn favorites(model: &Model) -> El<ModelEvent> {
 
             // Search results will go here.
             div!(class!("columns is-1 is-mobile is-multiline Favorites-images"),
-                model.favorites.favorites.values().map(|gif|
-                    gifcard(&gif,
-                        move |_id| ModelEvent::Noop,
-                        move |_id| ModelEvent::Noop,
-                        move |id, catg| ModelEvent::Favorites(FavoritesEvent::Categorize(id, catg)),
-                    )
-                ).collect::<Vec<_>>()
+                model.favorites.favorites.values()
+                    .filter(|gif| match model.favorites.filter.len() > 0 {
+                        true => gif.category.as_ref()
+                            .map(|catg| catg.contains(model.favorites.filter.as_str()))
+                            .unwrap_or(false),
+                        false => true,
+                    })
+                    .map(|gif|
+                        gifcard(&gif, model.favorites.category_updates.get(&gif.id),
+                            |_id| ModelEvent::Noop,
+                            |_id| ModelEvent::Noop,
+                            |id, catg| ModelEvent::Favorites(FavoritesEvent::UpdateCategory(id, catg)),
+                            |id| ModelEvent::Favorites(FavoritesEvent::Categorize(id)),
+                        )
+                    ).collect::<Vec<_>>()
             )
         )
     )

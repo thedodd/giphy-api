@@ -7,6 +7,7 @@ use actix_web::{
 };
 use common::{
     Error, GiphyGif, Response, User,
+    CategorizeGifRequest, CategorizeGifResponse,
     FetchFavoritesRequest, FetchFavoritesResponse,
     LoginRequest, LoginResponse,
     RegisterRequest, RegisterResponse,
@@ -210,6 +211,32 @@ pub fn favorites(
     Box::new(gifs_f)
 }
 
+/// Handle requests to categorize a GIF.
+pub fn categorize(
+    state: State<AppState>, data: Json<CategorizeGifRequest>, jwt: AuthHeader,
+) -> Box<dyn Future<Item=HttpResponse, Error=WebError>> {
+    // Validate the given JWT before processing request.
+    let user_id = match user_oid_from_auth(&state, jwt.0) {
+        Ok(user_id) => user_id,
+        Err(err) => return Box::new(ok(
+            HttpResponse::Ok().json(&Response::<CategorizeGifResponse>::Error(err))
+        )),
+    };
+
+    // Build future for fetching the user's saved GIFs.
+    let gif_f = state.db.send(db::CategorizeGif(user_id, data.into_inner()))
+        .then(flatten_mailbox_error)
+        .map(|gif| CategorizeGifResponse{gif: GiphyGif::from(gif)})
+        .then(|res| match res {
+            Ok(data) => Ok(Response::Data(data)),
+            Err(err) => Ok(Response::Error(err)),
+        })
+        .map(|res| HttpResponse::Ok().json(res))
+        .map_err(|_: ()| -> WebError { unreachable!() });
+
+    Box::new(gif_f)
+}
+
 #[derive(Deserialize, Serialize)]
 struct GiphySearchResponse<D> {
     pub data: D,
@@ -255,7 +282,6 @@ fn user_oid_from_auth(state: &AppState, jwt: Option<String>) -> Result<ObjectId,
     // FUTURE: in order to provide maximum security over the stateless JWT auth protocol,
     // we can introduce a nonce value to the user model. If the JWT's nonce (a timestamp)
     // does not match the user model, then the JWT is invalid.
-
     jwt.ok_or(Error::new("Unauthorized. No credentials provided.", 401, None))
         .map(|jwt| Claims::from_jwt(&jwt, &state.config.raw_idp_public_key)
             .map(|claims| ObjectId::with_string(&claims.sub).map_err(|_| {

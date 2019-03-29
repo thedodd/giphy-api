@@ -3,15 +3,17 @@ use std::collections::HashMap;
 use actix::prelude::*;
 use bcrypt::{BcryptError, DEFAULT_COST, hash, verify};
 use common::{
-    Error, GiphyGif, LoginRequest, RegisterRequest,
+    Error, GiphyGif, CategorizeGifRequest, LoginRequest, RegisterRequest,
 };
 use log::{error};
 use validator::Validate;
 use wither::{
     prelude::*,
     mongodb::{
-        doc, bson, oid::ObjectId,
-        Error as MongoError, Client, ThreadedClient, db::Database,
+        doc, bson,
+        Bson, Error as MongoError, Client, ThreadedClient,
+        db::Database, oid::ObjectId,
+        coll::options::{FindOneAndUpdateOptions, ReturnDocument},
     }
 };
 
@@ -57,6 +59,16 @@ impl Message for FindUserWithCreds {
 pub struct SaveGif(pub ObjectId, pub GiphyGif);
 
 impl Message for SaveGif {
+    type Result = Result<SavedGif, Error>;
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////////////
+// CategorizeGif /////////////////////////////////////////////////////////////////////////////////
+
+/// A message type for categorizing a GIF.
+pub struct CategorizeGif(pub ObjectId, pub CategorizeGifRequest);
+
+impl Message for CategorizeGif {
     type Result = Result<SavedGif, Error>;
 }
 
@@ -182,5 +194,30 @@ impl Handler<SaveGif> for MongoExecutor {
             }
         }
         Ok(model)
+    }
+}
+
+impl Handler<CategorizeGif> for MongoExecutor {
+    type Result = <CategorizeGif as Message>::Result;
+
+    /// Handle saving a user's GIF.
+    fn handle(&mut self, msg: CategorizeGif, _: &mut Self::Context) -> Self::Result {
+        let (user, gif) = (msg.0, msg.1);
+        let filter = doc!{"user": user, "giphy_id": gif.id};
+        let update = match gif.category.len() > 0 {
+            true => doc!{"$set": doc!{"category": gif.category}},
+            false => doc!{"$set": doc!{"category": Bson::Null}},
+        };
+        let mut options = FindOneAndUpdateOptions::new();
+        options.return_document = Some(ReturnDocument::After);
+        SavedGif::find_one_and_update(self.0.clone(), filter, update, Some(options))
+            .map_err(|mongoerr| {
+                error!("Error while attempting to find and update GIF category. {:?}", mongoerr);
+                Error::new_ise()
+            })
+            .and_then(|opt| match opt {
+                Some(model) => Ok(model),
+                None => Err(Error::new("Could not find target GIF saved by user.", 400, None)),
+            })
     }
 }

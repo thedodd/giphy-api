@@ -11,7 +11,7 @@ use crate::{
 pub fn app(model: &Model) -> El<ModelEvent> {
     let route = &model.route;
 
-    section!(attrs!{"class" => "hero is-success is-fullheight"},
+    section!(attrs!{At::Class => "hero is-success is-fullheight"},
         if route != &Route::Init && route != &Route::Login {
             navbar(model)
         } else {

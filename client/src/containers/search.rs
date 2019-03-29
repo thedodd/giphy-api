@@ -11,6 +11,7 @@ use seed::prelude::*;
 use crate::{
     api,
     components::gifcard,
+    containers::FavoritesEvent,
     state::{Model, ModelEvent},
     utils::handle_common_errors,
 };
@@ -124,23 +125,23 @@ pub fn search(model: &Model) -> El<ModelEvent> {
     };
 
     div!(attrs!{At::Class => "Search hero-body"; At::Id => "search"},
-        div!(attrs!{"class" => "container"},
-            h1!(attrs!{"class" => "title has-text-centered"}, "Search", spinner),
-            div!(attrs!{"class" => "field is-horizontal Search-field-container"},
-                div!(attrs!{"class" => "field-body"},
-                    div!(attrs!{"class" => "field is-expanded"},
-                        div!(attrs!{"class" => "field has-addons"},
-                            p!(attrs!{"class" => "control"},
-                                a!(attrs!{"class" => "button is-static"},
-                                    i!(attrs!{"class" => "fas fa-search"}),
+        div!(attrs!{At::Class => "container"},
+            h1!(attrs!{At::Class => "title has-text-centered"}, "Search", spinner),
+            div!(attrs!{At::Class => "field is-horizontal Search-field-container"},
+                div!(attrs!{At::Class => "field-body"},
+                    div!(attrs!{At::Class => "field is-expanded"},
+                        div!(attrs!{At::Class => "field has-addons"},
+                            p!(attrs!{At::Class => "control"},
+                                a!(attrs!{At::Class => "button is-static"},
+                                    i!(attrs!{At::Class => "fas fa-search"}),
                                 ),
                             ),
-                            p!(attrs!{"class" => "control is-expanded"},
+                            p!(attrs!{At::Class => "control is-expanded"},
                                 input!(search_input_attrs,
                                     input_ev(Ev::Input, |val| ModelEvent::Search(SearchContainerEvent::UpdateSearchField(val))),
                                 ),
                             ),
-                            p!(attrs!{"class" => "control"},
+                            p!(attrs!{At::Class => "control"},
                                 a!(submit_button_attrs,
                                     simple_ev(Ev::Click, ModelEvent::Search(SearchContainerEvent::SubmitSearch)),
                                     "Submit"
@@ -156,10 +157,11 @@ pub fn search(model: &Model) -> El<ModelEvent> {
             // Search results will go here.
             div!(class!("columns is-1 is-mobile is-multiline Search-images"),
                 model.search.search_results.values().map(|gif|
-                    gifcard(&gif,
-                        move |id| ModelEvent::Search(SearchContainerEvent::SaveGif(id)),
-                        move |_id| ModelEvent::Noop,
-                        move |_id, _cat| ModelEvent::Noop,
+                    gifcard(&gif, model.favorites.category_updates.get(&gif.id),
+                        |id| ModelEvent::Search(SearchContainerEvent::SaveGif(id)),
+                        |_id| ModelEvent::Noop,
+                        |id, catg| ModelEvent::Favorites(FavoritesEvent::UpdateCategory(id, catg)),
+                        |id| ModelEvent::Favorites(FavoritesEvent::Categorize(id)),
                     )
                 ).collect::<Vec<_>>()
             )

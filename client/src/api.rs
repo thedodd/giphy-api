@@ -1,5 +1,6 @@
 use common::{
     Error, Response,
+    CategorizeGifRequest, CategorizeGifResponse,
     FetchFavoritesRequest, FetchFavoritesResponse,
     LoginRequest, LoginResponse,
     RegisterRequest, RegisterResponse,
@@ -27,6 +28,7 @@ lazy_static! {
     static ref SEARCH_URL: String = format!("{}/search_giphy", &*BASE_URL);
     static ref SAVE_GIF_URL: String = format!("{}/save_gif", &*BASE_URL);
     static ref FAVORITES_URL: String = format!("{}/favorites", &*BASE_URL);
+    static ref CATG_URL: String = format!("{}/categorize", &*BASE_URL);
 }
 
 /// Submit a login request.
@@ -76,6 +78,17 @@ pub fn favorites(req: FetchFavoritesRequest, jwt: String) -> impl Future<Item=Fe
             log_1(&err);
             Error::new(FUT_ERROR, 500, None)
         }).then(flatten_payload)
+}
+
+/// Submit a request to categorize a GIF.
+pub fn categorize(req: CategorizeGifRequest, jwt: String) -> impl Future<Item=CategorizeGifResponse, Error=(String, Error)> {
+    Request::new(&*CATG_URL).method(Method::Post)
+        .header(CTYPE, APP_JSON).header(AUTHZ, &format!("bearer {}", jwt))
+        .body_json(&req).fetch_json().map_err(|err| {
+            log_1(&err);
+            Error::new(FUT_ERROR, 500, None)
+        }).then(flatten_payload)
+        .map_err(move |err| (req.id.clone(), err))
 }
 
 /// Flatten the result of an API response.
