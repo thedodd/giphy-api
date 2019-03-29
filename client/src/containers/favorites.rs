@@ -152,7 +152,7 @@ pub fn favorites(model: &Model) -> El<ModelEvent> {
             ),
 
             // Search results will go here.
-            div!(class!("columns is-1 is-mobile is-multiline Favorites-images"),
+            div!(class!("columns is-1 is-mobile is-multiline is-centered Favorites-images"),
                 model.favorites.favorites.values()
                     .filter(|gif| match model.favorites.filter.len() > 0 {
                         true => gif.category.as_ref()
