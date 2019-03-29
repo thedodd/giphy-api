@@ -1,20 +1,6 @@
 giphy api
 =========
-Design and implement a web application that allows a user to search for and save animated GIFs to a user profile using the [GIPHY API](https://developers.giphy.com/docs/).
-
-**Requirements:**
-- [x] Provide users with the ability to register and login to your application.
-- [x] As well as the ability to search for animated GIFs from the GIPHY API.
-- [x] As well as the ability to save and view their favorite GIFs to their profile.
-- [x] Also provide the user with the ability to categorize these saved GIFs (ex: funny, animals, etc.).
-- [x] User data should be stored in a database.
-- [x] Basic application security practices should be implemented (OWASP Top 9).
-- [x] GIFs available on your application should be limited to a G-Rating.
-
-**Bonus:**
-- [x] filter saved gifs by their category.
-
-**NB:** items marked as `// FUTURE:` are simply items which I've skipped over in the name of brevity, but which we would normally want to finish implementing before deploying.
+A WebAssembly application that allows a user to search for and save animated GIFs to a user profile using the [GIPHY API](https://developers.giphy.com/docs/).
 
 ### overview
 #### api
@@ -58,3 +44,12 @@ openssl rsa -in /tmp/keypair.pem -out /tmp/private.key
 # Extract the public key.
 openssl rsa -in /tmp/keypair.pem -pubout -out /tmp/public.key
 ```
+
+----
+
+### demo images mobile
+<img style="max-height:350px" src=".demo-images/0-login.png"/>
+<img style="max-height:350px" src=".demo-images/1-search.png"/>
+<img style="max-height:350px" src=".demo-images/2-navbar.png"/>
+<img style="max-height:350px" src=".demo-images/3-search-results.png"/>
+<img style="max-height:350px" src=".demo-images/4-favorites-and-categorization.png"/>

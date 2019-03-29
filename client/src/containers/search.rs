@@ -155,7 +155,7 @@ pub fn search(model: &Model) -> El<ModelEvent> {
             ),
 
             // Search results will go here.
-            div!(class!("columns is-1 is-mobile is-multiline Search-images"),
+            div!(class!("columns is-1 is-mobile is-multiline is-centered Search-images"),
                 model.search.search_results.values().map(|gif|
                     gifcard(&gif, model.favorites.category_updates.get(&gif.id),
                         |id| ModelEvent::Search(SearchContainerEvent::SaveGif(id)),

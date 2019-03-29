@@ -41,7 +41,7 @@ pub fn gifcard(
         input_attrs.add(At::Disabled, "true");
     }
 
-    div!(class!("column is-full-mobile is-half-tablet is-one-quarter-desktop"),
+    div!(class!("GifCard-card column is-full-mobile is-half-tablet is-one-quarter-desktop"),
         div!(class!("box p-three-quarter"),
             div!(class!("media justify-content-center"),
                 div!(class!("media-center"),
