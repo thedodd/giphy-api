@@ -22,6 +22,8 @@ use crate::{
     models::{SavedGif, User},
 };
 
+const INVALID_CREDS: &str = "Invalid credentials provided.";
+
 //////////////////////////////////////////////////////////////////////////////////////////////////
 // CreateUser ////////////////////////////////////////////////////////////////////////////////////
 
@@ -158,7 +160,7 @@ impl Handler<FindUserWithCreds> for MongoExecutor {
         let user = match User::find_one(self.0.clone(), Some(doc!{"email": email}), None) {
             Ok(Some(user)) => Ok(user),
             Ok(None) => {
-                Err(Error::new("Invalid credentials provided.", 400, None))
+                Err(Error::new(INVALID_CREDS, 400, None))
             }
             Err(err) => {
                 error!("Error while looking up user. {:?}", err);
@@ -168,9 +170,12 @@ impl Handler<FindUserWithCreds> for MongoExecutor {
 
         // Check the user's creds.
         match verify(&msg.0.password, &user.pwhash) {
-            Ok(_) => Ok(user),
+            Ok(is_valid) => match is_valid {
+                true => Ok(user),
+                false => Err(Error::new(INVALID_CREDS, 400, None))
+            }
             Err(BcryptError::InvalidPassword) => {
-                Err(Error::new("Invalid credentials provided.", 400, None))
+                Err(Error::new(INVALID_CREDS, 400, None))
             }
             Err(err) => {
                 error!("Error from bcrypt while checking user's password. {:?}", err);

@@ -1,5 +1,3 @@
-use std::borrow::Cow;
-
 use common::{
     Error, User,
     LoginRequest, LoginResponse,
@@ -16,14 +14,18 @@ use crate::{
     utils::{set_session_item}
 };
 
+const NBSP: &str = " "; // Is not a space, it is an NBSP;
+const EMAIL_ERR: &str = "Must provide a valid email address.";
+const PASSWD_ERR: &str = "Password must be at least 6 characters in length.";
+
 /// The state of the login container.
 #[derive(Default)]
 pub struct LoginContainer {
     pub email: String,
-    pub email_error: Option<Cow<'static, str>>,
+    pub email_error: Option<&'static str>,
     pub pw: String,
-    pub pw_error: Option<Cow<'static, str>>,
-    pub network_error: Option<String>,
+    pub pw_error: Option<&'static str>,
+    pub network_error: Option<Error>,
     pub has_network_request: bool,
 }
 
@@ -36,6 +38,13 @@ impl LoginContainer {
         self.pw_error = None;
         self.network_error = None;
         self.has_network_request = false;
+    }
+
+    /// Clear any errors on this model.
+    fn clear_errors(&mut self) {
+        self.email_error = None;
+        self.pw_error = None;
+        self.network_error = None;
     }
 }
 
@@ -57,22 +66,17 @@ impl LoginContainerEvent {
     pub fn reducer(event: LoginContainerEvent, mut model: &mut Model) -> Update<ModelEvent> {
         match event {
             LoginContainerEvent::UpdateEmailField(email) => {
-                match validate_email(&email) {
-                    false if email.len() > 0 => { model.login.email_error = Some(Cow::Borrowed("Must provide a valid email address.")); }
-                    _ => { model.login.email_error = None; }
-                }
+                model.login.clear_errors();
                 model.login.email = email;
                 Render.into()
             }
             LoginContainerEvent::UpdatePWField(pw) => {
-                match pw.len() >= 6 {
-                    false => { model.login.pw_error = Some(Cow::Borrowed("Password must be at least 6 characters in length.")); }
-                    true => { model.login.pw_error = None; }
-                }
+                model.login.clear_errors();
                 model.login.pw = pw;
                 Render.into()
             }
             LoginContainerEvent::Login => {
+                model.login.clear_errors();
                 model.login.has_network_request = true;
                 let payload = LoginRequest{email: model.login.email.clone(), password: model.login.pw.clone()};
                 Update::with_future_msg(api::login(payload)
@@ -80,6 +84,21 @@ impl LoginContainerEvent {
                     .map_err(|e| ModelEvent::Login(LoginContainerEvent::LoginError(e))))
             }
             LoginContainerEvent::Register => {
+                // Validate current input before submitting.
+                if model.login.email_error.is_some() || model.login.pw_error.is_some() || model.login.has_network_request {
+                    return Skip.into()
+                }
+                if !validate_email(&model.login.email) && model.login.email.len() > 0 {
+                    model.login.email_error = Some(EMAIL_ERR);
+                    return Render.into();
+                }
+                if model.login.pw.len() < 6 {
+                    model.login.pw_error = Some(PASSWD_ERR);
+                    return Render.into();
+                }
+
+                // Evertying is ready to rock, so submit the registration request.
+                model.login.clear_errors();
                 model.login.has_network_request = true;
                 let payload = RegisterRequest{email: model.login.email.clone(), password: model.login.pw.clone()};
                 Update::with_future_msg(api::register(payload)
@@ -95,7 +114,7 @@ impl LoginContainerEvent {
 
     fn handle_error(err: Error, mut model: &mut Model) -> Update<ModelEvent> {
         model.login.has_network_request = false;
-        model.login.network_error = Some(err.description);
+        model.login.network_error = Some(err);
         Render.into()
     }
 
@@ -112,10 +131,14 @@ impl LoginContainerEvent {
 /// The login view.
 pub fn login(model: &Model) -> El<ModelEvent> {
     let is_email_success = model.login.email.len() > 0 && model.login.email_error.is_none();
-    let is_pw_success = model.login.pw.len() >= 6;
+    let is_pw_success = model.login.pw.len() > 0;
     let button_attrs = match is_email_success && is_pw_success {
         true => attrs!{At::Class => "button is-dark is-outlined"},
         false => attrs!{At::Class => "button is-dark is-outlined"; At::Disabled => true},
+    };
+    let spinner: El<ModelEvent> = match model.login.has_network_request {
+        true => span!(class!("icon"), i!(attrs!(At::Class => "fas fa-spinner fa-pulse"))),
+        false => seed::empty(),
     };
 
     div!(attrs!{At::Class => "hero-body Login"},
@@ -149,7 +172,7 @@ pub fn login(model: &Model) -> El<ModelEvent> {
                         ),
                     ),
                     div!(attrs!{At::Class => "field"},
-                        div!(attrs!{At::Class => "columns is-mobile"},
+                        div!(attrs!{At::Class => "columns is-mobile is-vcentered"},
                             div!(attrs!{At::Class => "column is-narrow"},
                                 button!(
                                     &button_attrs,
@@ -163,15 +186,17 @@ pub fn login(model: &Model) -> El<ModelEvent> {
                                     simple_ev(Ev::Click, ModelEvent::Login(LoginContainerEvent::Register)),
                                     "Register"
                                 )
-                            )
+                            ),
+                            div!(attrs!{At::Class => "column is-narrow"}, spinner)
                         )
                     )
                 )
             ),
             p!(attrs!{At::Class => "control"},
-                model.login.email_error.as_ref()
-                    .or(model.login.pw_error.as_ref())
-                    .unwrap_or(&Cow::Borrowed(" "))) // Is a &NBSP;
+                model.login.email_error
+                    .or(model.login.pw_error)
+                    .or(model.login.network_error.as_ref().map(|e| e.description.as_str()))
+                    .unwrap_or(NBSP))
         )
     )
 }

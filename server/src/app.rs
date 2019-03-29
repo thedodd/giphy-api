@@ -62,11 +62,11 @@ pub fn new_app(db: Addr<MongoExecutor>, client: Client, config: Arc<Config>) -> 
 
             .finish()
     })
-    .bind("127.0.0.1:8080") // TODO: 0.0.0.0
-    .expect("Expected to bind 127.0.0.1:8080 successfully.")
+    .bind("0.0.0.0:8080")
+    .expect("Expected to bind 0.0.0.0:8080 successfully.")
     .start();
 
-    info!("Server is listening on 127.0.0.1:8080.");
+    info!("Server is listening on 0.0.0.0:8080.");
     app
 }
 

@@ -40,6 +40,15 @@ pub fn set_session_item(key: &str, val: &str) -> Result<(), Cow<'static, str>> {
         }))
 }
 
+/// Set a session storage key.
+pub fn del_session_item(key: &str) {
+    let _ = get_session_storage()
+        .map_err(|_| ())
+        .and_then(|s| s.remove_item(key).map_err(|err| {
+            log!(format!("Failed to remove session storage key '{}': {:?}", key, err));
+        }));
+}
+
 /// Get a handle to the window's session storage.
 fn get_session_storage() -> Result<Storage, Cow<'static, str>> {
     let err_msg = "Could not access session storage.";

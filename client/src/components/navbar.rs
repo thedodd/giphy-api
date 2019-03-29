@@ -19,7 +19,6 @@ pub fn navbar(model: &Model) -> El<ModelEvent> {
     }
 
     // FUTURE: nice-to-have: wire up overlay for click-away.
-    // TODO: wire up the logout handler.
 
     nav!(attrs!(At::Class => "Navbar navbar is-black is-fixed-top"),
         div!(attrs!(At::Class => "navbar-brand"),

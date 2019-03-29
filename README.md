@@ -30,7 +30,8 @@ We are using MongoDB as the backend for this system. We are using an ODM, called
 First, ensure you have [docker](https://docs.docker.com/install/#supported-platforms) & [docker compose](https://docs.docker.com/compose/install/) installed on your system. Everything in this system is intended to run entirely within docker.
 
 ```bash
-# Boot the entire system.
+# Once you have docker in place, booting the entire system is just one comamnd.
+# NOTE: when first run, it will take some time to compile the client & server.
 docker-compose up -d
 
 # Stream the logs to ensure everything has come online as needed.

@@ -8,7 +8,8 @@ use crate::{
         SearchContainer, SearchContainerEvent,
     },
     router::Route,
-    ui::{UIState, UIStateEvent}
+    ui::{UIState, UIStateEvent},
+    utils,
 };
 
 /// The root data model of this application.
@@ -54,6 +55,7 @@ pub fn update(msg: ModelEvent, model: &mut Model) -> Update<ModelEvent> {
         ModelEvent::Noop => Skip.into(),
         ModelEvent::Logout => {
             model.pristine();
+            utils::del_session_item("user");
             Update::with_msg(ModelEvent::Route(Route::Login))
         }
         ModelEvent::Route(route) => {
