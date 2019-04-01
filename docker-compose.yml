@@ -2,24 +2,14 @@ version: '3'
 services:
   server:
     build: .
-    container_name: server
     ports:
       - 8080:8080
-    volumes:
-      - ./client:/api/client
-      - ./common:/api/common
-      - ./server:/api/server
-      - ./static:/api/static
-      - ./Cargo.toml:/api/Cargo.toml
-      - ./Cargo.lock:/api/Cargo.lock
-      - ./Makefile.toml:/api/Makefile.toml
     env_file: ./env/dev
 
   mongo:
     image: mongo:4.0
-    container_name: mongo
     ports:
-      - 27017:27017
+      - 27017
     volumes:
       - mongo:/data/db
 

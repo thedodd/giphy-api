@@ -45,6 +45,24 @@ openssl rsa -in /tmp/keypair.pem -out /tmp/private.key
 openssl rsa -in /tmp/keypair.pem -pubout -out /tmp/public.key
 ```
 
+##### development
+For rapid development, use the `docker-compose.dev.yml` file which mounts the local directories of this repo to watch for changes and recompile.
+
+```bash
+# Boot up the docker compose dev file.
+docker-compose -f docker-compose.dev.yml up -d
+
+# Stream the logs to ensure everything has come online as needed.
+docker-compose -f docker-compose.dev.yml logs -f
+
+# You can access the MongoDB instance via the following command.
+docker-compose -f docker-compose.dev.yml exec mongo mongo
+```
+
+A few items to note:
+- this will expose the app on port `8081` instead of `8080` to avoid conflicts.
+- this will run the server & the client code in watch mode so that changes to the respective directories will cause the app to be quickly recompiled.
+
 ----
 
 ### demo images mobile
