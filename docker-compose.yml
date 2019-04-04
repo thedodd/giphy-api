@@ -5,11 +5,20 @@ services:
     ports:
       - 8080:8080
     env_file: ./env/dev
+    volumes:
+      - ./common:/api/common
+      - ./server:/api/server
+      - ./Cargo.toml:/api/Cargo.toml
+      - ./Cargo.lock:/api/Cargo.lock
+      - ./Makefile.toml:/api/Makefile.toml
+      # NB: if you need to volume mount the ./static directory, kill any running server instance,
+      # and then execute `docker-compose run -v ./static:/api/static` to bring the server up with
+      # the static directory mounted.
 
   mongo:
     image: mongo:4.0
     ports:
-      - 27017
+      - 27017:27017
     volumes:
       - mongo:/data/db
 

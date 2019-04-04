@@ -46,22 +46,21 @@ openssl rsa -in /tmp/keypair.pem -pubout -out /tmp/public.key
 ```
 
 ##### development
-For rapid development, use the `docker-compose.dev.yml` file which mounts the local directories of this repo to watch for changes and recompile.
+For rapid development, start with the standard docker compose setup described above. Next, we will bring down the server and then run a new copy which will volume mount this repo's `static` directory, and we will have it run in watch mode so that the server will recompile anytime the server code changes.
 
 ```bash
-# Boot up the docker compose dev file.
-docker-compose -f docker-compose.dev.yml up -d
+# Bring down any running copy of the server.
+docker-compose rm -sfv server
 
-# Stream the logs to ensure everything has come online as needed.
-docker-compose -f docker-compose.dev.yml logs -f
-
-# You can access the MongoDB instance via the following command.
-docker-compose -f docker-compose.dev.yml exec mongo mongo
+# Bring up a new copy which mounts ./static & runs in watch mode.
+docker-compose run -v ./static:/api/static -p 8080:8080 server cargo make watch-server-run
 ```
 
-A few items to note:
-- this will expose the app on port `8081` instead of `8080` to avoid conflicts.
-- this will run the server & the client code in watch mode so that changes to the respective directories will cause the app to be quickly recompiled.
+A few things to note:
+- the server will now be running in watch mode & will respond to any changes which take place in the server code.
+- the `static` directory will be mounted by the server, so any changes to the files there will be served by the server.
+
+From here you can use `cargo make watch-client` to watch the client code and run its pipeline when its code changes.
 
 ----
 

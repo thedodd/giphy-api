@@ -13,7 +13,7 @@ futures = "0.1"
 js-sys = "=0.3.17"
 lazy_static = "1.3"
 log = "0.4"
-seed = "0.3"
+seed = { git="https://github.com/David-OConnor/seed.git", rev="278b77a951be6dbeac90d7f829e03fea93f45440" }
 serde = "1.0"
 serde_derive = "1.0"
 serde_json = "1.0"
