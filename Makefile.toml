@@ -32,6 +32,14 @@ workspace = false
 command = "cargo"
 args = ["build", "-p", "server", "--release"]
 
+[tasks.server-run]
+workspace = false
+command = "cargo"
+args = ["run", "-p", "server", "--release"]
+
+##################################################################################################
+# App Tasks ######################################################################################
+
 [tasks.app-build]
 workspace = false
 dependencies = [
