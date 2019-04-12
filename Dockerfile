@@ -1,13 +1,14 @@
 FROM rust:1.33-slim
 
 LABEL maintainer="Anthony Josiah Dodd <adodd@docql.io>"
-EXPOSE 8080
+EXPOSE 9000
 WORKDIR /api
 
 # Add a few system deps.
 RUN apt-get update && apt-get install -y make pkg-config libssl-dev && \
     rustup target add wasm32-unknown-unknown && \
-    cargo install cargo-make
+    cargo install cargo-make --version 0.17.0 && \
+    cargo install cargo-watch --version 7.2.0
 
 COPY ./client client
 COPY ./common common

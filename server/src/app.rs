@@ -30,10 +30,11 @@ pub struct AppState {
 }
 
 pub fn new_app(db: Addr<MongoExecutor>, client: Client, config: Arc<Config>) -> Addr<Server> {
+    let mv_cfg = config.clone();
     let app = server::new(move || {
         let state = AppState{
             client: client.clone(),
-            config: config.clone(),
+            config: mv_cfg.clone(),
             db: db.clone(),
         };
 
@@ -62,11 +63,11 @@ pub fn new_app(db: Addr<MongoExecutor>, client: Client, config: Arc<Config>) -> 
 
             .finish()
     })
-    .bind("0.0.0.0:8080")
-    .expect("Expected to bind 0.0.0.0:8080 successfully.")
+    .bind(format!("0.0.0.0:{}", &config.port))
+    .expect(&format!("Expected to bind 0.0.0.0:{} successfully.", &config.port))
     .start();
 
-    info!("Server is listening on 0.0.0.0:8080.");
+    info!("Server is listening on 0.0.0.0:{}.", &config.port);
     app
 }
 

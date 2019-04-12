@@ -5,6 +5,8 @@ use serde_derive::Deserialize;
 /// Config defines this API's runtime configuration.
 #[derive(Deserialize)]
 pub struct Config {
+    pub port: u16,
+
     // Database Config //
     pub backend_connection_string: String,
     pub backend_database: String,

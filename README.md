@@ -27,7 +27,7 @@ docker-compose logs -f
 docker-compose exec mongo mongo
 ```
 
-Now you're ready to start using the app. Simply navigate to http://localhost:8080 to get started.
+Now you're ready to start using the app. Simply navigate to http://localhost:9000 to get started.
 
 ----
 
@@ -46,22 +46,41 @@ openssl rsa -in /tmp/keypair.pem -pubout -out /tmp/public.key
 ```
 
 ##### development
-For rapid development, use the `docker-compose.dev.yml` file which mounts the local directories of this repo to watch for changes and recompile.
+For rapid development, start with the standard docker compose setup described above. Next, we will bring down the server and then run a new copy which will volume mount this repo's `static` directory, and we will have it run in watch mode so that the server will recompile anytime the server code changes.
 
 ```bash
-# Boot up the docker compose dev file.
-docker-compose -f docker-compose.dev.yml up -d
+# Bring down any running copy of the server.
+docker-compose rm -sfv server
 
-# Stream the logs to ensure everything has come online as needed.
-docker-compose -f docker-compose.dev.yml logs -f
-
-# You can access the MongoDB instance via the following command.
-docker-compose -f docker-compose.dev.yml exec mongo mongo
+# Bring up a new copy which mounts ./static & runs in watch mode.
+docker-compose run -v ./static:/api/static -p 9000:9000 server cargo make watch-server-run
 ```
 
-A few items to note:
-- this will expose the app on port `8081` instead of `8080` to avoid conflicts.
-- this will run the server & the client code in watch mode so that changes to the respective directories will cause the app to be quickly recompiled.
+A few things to note:
+- the server will now be running in watch mode & will respond to any changes which take place in the server code.
+- the `static` directory will be mounted by the server, so any changes to the files there will be served by the server.
+
+From here you can use `cargo make watch-client` to watch the client code and run its pipeline when its code changes.
+
+##### non-docker development
+If you need to build and run this system outside of a docker context for whatever reason, there are a few things that you will need first.
+
+- First, follow the `rustup` installation instructions found at [rustup.rs](https://rustup.rs/). After installation, you should have the latest stable version of rustc & cargo.
+- Next, install a few cargo deps.
+    - `cargo install cargo-make --version 0.17.0`
+    - `cargo install cargo-watch --version 7.2.0`
+- Finally, you can run the various tasks in `Makefile.toml`. You will need to source the environment variables in `env/dev.local` before running the server. The docker setup does this for you automatically.
+    - `cargo make app-build` - this builds the server & the client, including all WASM, HTML & CSS processing.
+    - `cargo make client-flow` - this builds only the client, and runs the WASM, HTML & CSS processing.
+    - `cargo make server-build` - this builds the server.
+    - `cargo make server-run` - this will build and run the server. **NB:** ensure you have sourced the needed env vars in `env/dev.local` first.
+
+**AS A FINAL NOTE:** all of this is complexity is removed by just using docker, as described above in the [setup section](#setup). If you can not run things in docker, then you will need to ensure you have a MongoDB instance running on your machine, and reachable on port `27017` on loopback.
+
+###### NOTE ON NON-POSIX SYSTEMS
+I don't really do non-posix systems much, so if you run into some serious issues with building this on Windows ... please pop and issue once you've got things resolved.
+
+If you are running into OpenSSL issues, it may be worthwile to take a look at [mesalink](https://github.com/mesalock-linux/mesalink/releases) for a OpenSSL compatible Rust implementation. You may have better luck. Let me know.
 
 ----
 
