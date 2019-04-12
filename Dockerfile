@@ -1,7 +1,7 @@
 FROM rust:1.33-slim
 
 LABEL maintainer="Anthony Josiah Dodd <adodd@docql.io>"
-EXPOSE 8080
+EXPOSE 9000
 WORKDIR /api
 
 # Add a few system deps.

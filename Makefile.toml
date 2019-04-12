@@ -8,7 +8,7 @@ args = ["build", "-p", "client", "--release", "--target", "wasm32-unknown-unknow
 
 [tasks.client-bindgen]
 workspace = false
-install_crate = { crate_name="wasm-bindgen-cli", binary="wasm-bindgen", test_arg="--help" }
+install_crate = { crate_name="wasm-bindgen-cli", version="0.2.42", binary="wasm-bindgen", test_arg="--help" }
 command = "wasm-bindgen"
 args = ["target/wasm32-unknown-unknown/release/client.wasm", "--no-modules", "--out-dir", "./static"]
 

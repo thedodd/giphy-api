@@ -27,7 +27,7 @@ docker-compose logs -f
 docker-compose exec mongo mongo
 ```
 
-Now you're ready to start using the app. Simply navigate to http://localhost:8080 to get started.
+Now you're ready to start using the app. Simply navigate to http://localhost:9000 to get started.
 
 ----
 
@@ -53,7 +53,7 @@ For rapid development, start with the standard docker compose setup described ab
 docker-compose rm -sfv server
 
 # Bring up a new copy which mounts ./static & runs in watch mode.
-docker-compose run -v ./static:/api/static -p 8080:8080 server cargo make watch-server-run
+docker-compose run -v ./static:/api/static -p 9000:9000 server cargo make watch-server-run
 ```
 
 A few things to note:
