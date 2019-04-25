@@ -131,11 +131,8 @@ pub fn favorites(model: &Model) -> El<ModelEvent> {
                     div!(attrs!{At::Class => "field is-expanded"},
                         div!(attrs!{At::Class => "field has-addons"},
                             p!(attrs!{At::Class => "control"},
-                                // NB: due to a rendering bug in this framework, we need to be
-                                // sure that this `button!` element type is different than the
-                                // element type on the search page.
-                                button!(attrs!{At::Class => "button is-static"},
-                                    i!(attrs!{At::Class => "fas fa-filter"}),
+                                button!(class!("button is-static"),
+                                    i!(class!("fas fa-filter")),
                                 ),
                             ),
                             p!(attrs!{At::Class => "control is-expanded"},

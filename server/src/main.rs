@@ -4,6 +4,7 @@ mod db;
 mod handlers;
 mod jwt;
 mod models;
+mod ws;
 
 use std::sync::Arc;
 
@@ -17,6 +18,7 @@ use crate::{
     app::new_app,
     db::MongoExecutor,
     models::{SavedGif, User},
+    ws::SocketHandler,
 };
 
 fn main() {
@@ -35,6 +37,8 @@ fn main() {
     // Boot the various actors of this system.
     let sys = actix::System::new("api");
     let db_executor = SyncArbiter::start(4, move || db.clone());
-    let _server = new_app(db_executor, client, cfg);
+    let (cfg_, db_, cli_) = (cfg.clone(), db_executor.clone(), client.clone());
+    let socket_handler = Arbiter::start(move |_| SocketHandler::new(cfg_, db_, cli_));
+    let _server = new_app(db_executor, socket_handler, client, cfg);
     let _ = sys.run();
 }

@@ -1,4 +1,4 @@
-RUST_LOG=server=info
+RUST_LOG=server=debug
 PORT=9000
 
 ## Database Config ##

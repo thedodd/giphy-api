@@ -14,6 +14,7 @@ services:
       # NB: if you need to volume mount the ./static directory, kill any running server instance,
       # and then execute `docker-compose run -v ./static:/api/static` to bring the server up with
       # the static directory mounted.
+      - ./static:/api/static
 
   mongo:
     image: mongo:4.0

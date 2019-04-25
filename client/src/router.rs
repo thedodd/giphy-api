@@ -26,10 +26,10 @@ impl Route {
     /// **NOTE WELL:** this should really only be called from the ModelEvent::Route handler.
     pub fn push(&self) {
         match self {
-            Route::Init => seed::push_path(vec!["ui"]),
-            Route::Login => seed::push_path(vec!["ui", "login"]),
-            Route::Search => seed::push_path(vec!["ui", "search"]),
-            Route::Favorites => seed::push_path(vec!["ui", "favorites"]),
+            Route::Init => seed::push_route(vec!["ui"]),
+            Route::Login => seed::push_route(vec!["ui", "login"]),
+            Route::Search => seed::push_route(vec!["ui", "search"]),
+            Route::Favorites => seed::push_route(vec!["ui", "favorites"]),
         }
     }
 

@@ -1,4 +1,7 @@
+use std::rc::Rc;
+
 use common::User;
+use gloo::websocket::cb::WebSocket;
 use seed::prelude::*;
 
 use crate::{
@@ -15,6 +18,7 @@ use crate::{
 /// The root data model of this application.
 #[derive(Default)]
 pub struct Model {
+    pub ws: Option<Rc<WebSocket>>,
     pub is_initializing: bool,
     pub route: Route,
     pub ui: UIState,
@@ -27,6 +31,7 @@ pub struct Model {
 impl Model {
     /// Revert the model back to a pristine state.
     pub fn pristine(&mut self) {
+        self.ws = None;
         self.is_initializing = false;
         self.ui.pristine();
         self.user = None;
@@ -45,7 +50,7 @@ pub enum ModelEvent {
     Login(LoginContainerEvent),
     Search(SearchContainerEvent),
     Favorites(FavoritesEvent),
-    Initialized(Option<User>),
+    Initialized(Option<User>, Rc<WebSocket>),
     UI(UIStateEvent),
 }
 
@@ -70,10 +75,11 @@ pub fn update(msg: ModelEvent, model: &mut Model) -> Update<ModelEvent> {
         ModelEvent::Login(event) => LoginContainerEvent::reducer(event, model),
         ModelEvent::Search(event) => SearchContainerEvent::reducer(event, model),
         ModelEvent::Favorites(event) => FavoritesEvent::reducer(event, model),
-        ModelEvent::Initialized(user_opt) => {
+        ModelEvent::Initialized(user_opt, ws) => {
             let has_session = user_opt.is_some();
             model.is_initializing = false;
             model.user = user_opt;
+            model.ws = Some(ws);
 
             // If user needs to login, push them to the login page.
             if has_session {

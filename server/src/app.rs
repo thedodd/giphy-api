@@ -5,10 +5,10 @@ use std::{
 
 use actix::prelude::*;
 use actix_web::{
-    server,
+    server, ws as actix_ws,
     fs::{NamedFile, StaticFileConfig, StaticFiles},
     http::Method,
-    App, HttpRequest, Result,
+    App, HttpRequest, HttpResponse, Result,
 };
 use actix_net::server::Server;
 use log::info;
@@ -18,6 +18,7 @@ use crate::{
     config::Config,
     db::MongoExecutor,
     handlers,
+    ws::{SocketHandler, SocketState},
 };
 
 const STATIC_DIR: &str = "./static";
@@ -27,18 +28,27 @@ pub struct AppState {
     pub client: Client,
     pub config: Arc<Config>,
     pub db: Addr<MongoExecutor>,
+    pub socket_handler: Addr<SocketHandler>,
 }
 
-pub fn new_app(db: Addr<MongoExecutor>, client: Client, config: Arc<Config>) -> Addr<Server> {
+pub fn new_app(
+    db: Addr<MongoExecutor>, socket_handler: Addr<SocketHandler>, client: Client, config: Arc<Config>,
+) -> Addr<Server> {
+
     let mv_cfg = config.clone();
     let app = server::new(move || {
         let state = AppState{
             client: client.clone(),
             config: mv_cfg.clone(),
             db: db.clone(),
+            socket_handler: socket_handler.clone(),
         };
 
         App::with_state(state)
+            // WebSocket handler.
+            .resource("/ws/", |r| r.route().f(handle_socket))
+
+            // Primary API interface.
             .scope("/api", |scope| {
                 scope.resource("/register", |r| r.method(Method::POST).with(handlers::register))
                     .resource("/login", |r| r.method(Method::POST).with(handlers::login))
@@ -83,4 +93,10 @@ impl StaticFileConfig for StaticFileServerConfig {
     fn is_use_last_modifier() -> bool {
         true
     }
+}
+
+/// A simple handler for setting up WS connections.
+fn handle_socket(req: &HttpRequest<AppState>) -> Result<HttpResponse> {
+    let socket_handler = req.state().socket_handler.clone();
+    actix_ws::start(req, SocketState::new(socket_handler))
 }
