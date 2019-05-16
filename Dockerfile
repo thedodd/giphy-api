@@ -8,7 +8,8 @@ WORKDIR /api
 RUN apt-get update && apt-get install -y make pkg-config libssl-dev && \
     rustup target add wasm32-unknown-unknown && \
     cargo install cargo-make --version 0.17.0 && \
-    cargo install cargo-watch --version 7.2.0
+    cargo install cargo-watch --version 7.2.0 && \
+    cargo install wasm-bindgen-cli --version 0.2.42
 
 COPY ./client client
 COPY ./common common

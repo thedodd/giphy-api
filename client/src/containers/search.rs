@@ -132,7 +132,9 @@ pub fn search(model: &Model) -> El<ModelEvent> {
                     div!(attrs!{At::Class => "field is-expanded"},
                         div!(attrs!{At::Class => "field has-addons"},
                             p!(attrs!{At::Class => "control"},
-                                a!(attrs!{At::Class => "button is-static"},
+
+                                // NB: this is where part of the rendering bug is.
+                                button!(attrs!{At::Class => "button is-static"},
                                     i!(attrs!{At::Class => "fas fa-search"}),
                                 ),
                             ),
