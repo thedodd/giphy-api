@@ -1,40 +1,26 @@
-mod app;
+mod api;
+mod auth;
 mod config;
-mod db;
-mod handlers;
-mod jwt;
 mod models;
 
 use std::sync::Arc;
 
-use actix::prelude::*;
-use reqwest::r#async::Client;
-use env_logger;
-use log::info;
-use wither::prelude::*;
+pub type Tx = sqlx::Transaction<PgPoolConn>;
+pub type PgPoolConn = sqlx::pool::PoolConnection<sqlx::PgConnection>;
 
-use crate::{
-    app::new_app,
-    db::MongoExecutor,
-    models::{SavedGif, User},
-};
+#[actix_rt::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    tracing_subscriber::fmt::init();
 
-fn main() {
+    // Build needed state items for API.
     let cfg = Arc::new(config::Config::new());
-    let _ = env_logger::init();
+    let db = sqlx::PgPool::builder()
+        .max_size(10)
+        .build(&cfg.database_url)
+        .await?;
+    let client = reqwest::Client::new();
 
-    // Build HTTP client.
-    let client = Client::new();
-
-    // Connect to DB backend & sync models.
-    let db = MongoExecutor::new(&*cfg).expect("Unable to connect to database backend.");
-    info!("Synchronizing data models.");
-    User::sync(db.0.clone()).expect("Faild to sync User model.");
-    SavedGif::sync(db.0.clone()).expect("Faild to sync SavedGif model.");
-
-    // Boot the various actors of this system.
-    let sys = actix::System::new("api");
-    let db_executor = SyncArbiter::start(4, move || db.clone());
-    let _server = new_app(db_executor, client, cfg);
-    let _ = sys.run();
+    // Build & start the API.
+    api::new(db, client, cfg.clone())?.await?; // Blocks.
+    Ok(())
 }

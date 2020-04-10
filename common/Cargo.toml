@@ -5,7 +5,17 @@ authors = ["Anthony Dodd <dodd.anthonyjosiah@gmail.com>"]
 edition = "2018"
 
 [dependencies]
-serde = "1"
-serde_derive = "1"
-validator = "0.8"
-validator_derive = "0.8"
+serde = { version="1", features=["derive"] }
+serde_json = "1"
+validator = "0.10"
+validator_derive = "0.10"
+
+# Feature: server
+actix-web = { version="2", optional=true }
+futures = { version="0.3", optional=true }
+sqlx = { version="0.3", default-features=false, features=["runtime-tokio"], optional=true }
+tracing = { version="0.1", optional=true }
+
+[features]
+default = []
+server = ["actix-web", "futures", "sqlx", "tracing"]

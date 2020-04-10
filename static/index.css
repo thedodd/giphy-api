@@ -1,0 +1,86 @@
+/* Login */
+
+.Login .container {
+    margin-left: auto;
+    margin-right: auto;
+    max-width: 350px;
+}
+
+.Search {
+    margin-top: 1rem;
+}
+
+.Search-field-container {
+    max-width: 600px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.Search .Search-images .image {
+    margin: 0 !important;
+}
+
+.Search .Search-images .box .media {
+    min-width: 3rem;
+}
+
+.Favorites {
+    margin-top: 1rem;
+}
+
+.Favorites-field-container {
+    max-width: 600px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.Favorites .Favorites-images .image {
+    margin: 0 !important;
+}
+
+.Favorites .Favorites-images .box .media {
+    min-width: 3rem;
+}
+
+/************************************************************************************************
+* Components ************************************************************************************
+*************************************************************************************************/
+
+.Navbar.navbar.is-black {
+    background-color: #0a0a0a;
+}
+
+.GifCard-card {
+    min-width: 275px !important;
+}
+
+/************************************************************************************************
+* Helpers ***************************************************************************************
+*************************************************************************************************/
+
+/* Margin */
+
+.mh-auto {
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.mb-half {
+    margin-bottom: 0.5rem !important;
+}
+
+.ml-1 {
+    margin-left: 1rem !important;
+}
+
+/* Padding */
+
+.p-three-quarter {
+    padding: 0.75rem !important;
+}
+
+/* Flex */
+
+.justify-content-center {
+    justify-content: center;
+}
