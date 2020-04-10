@@ -46,6 +46,8 @@ impl std::fmt::Display for Error {
 impl Error {
     const BODY_MALFORMED: &'static str = "Malformed body in request.";
     const INVALID_CREDENTIALS: &'static str = "Invalid credentials provided.";
+    const UNAUTHORIZED_TOKEN_EXPIRED: &'static str = "Unauthorized. Token is expired.";
+    const UNAUTHORIZED_INVALID_TOKEN: &'static str = "Unauthorized. Invalid token provided.";
 
     /// Create a new error indicating that the body of the request was malformed.
     pub fn new_deser_err(src: serde_json::error::Error) -> Self {
@@ -56,6 +58,16 @@ impl Error {
     /// Create a new error indicating that the given credentials were invalid.
     pub fn new_invalid_credentials() -> Self {
         Self::new(Self::INVALID_CREDENTIALS.into(), 401, None)
+    }
+
+    /// Create a new error indicating that the given JWT was expired.
+    pub fn new_token_expired() -> Self {
+        Self::new(Self::UNAUTHORIZED_TOKEN_EXPIRED.into(), 401, None)
+    }
+
+    /// Create a new error indicating that the given JWT was expired.
+    pub fn new_invalid_token() -> Self {
+        Self::new(Self::UNAUTHORIZED_INVALID_TOKEN.into(), 401, None)
     }
 }
 

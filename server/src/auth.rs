@@ -1,3 +1,4 @@
+use actix_web::HttpRequest;
 use bcrypt::{DEFAULT_COST, hash, verify};
 use chrono::prelude::*;
 use common::Error;
@@ -56,37 +57,63 @@ impl Claims {
         })?)
     }
 
-    // /// Attempt to extract a claims body from the given JWT.
-    // ///
-    // /// This routine will check the veracity of the token's signature, ensuring the token
-    // /// has not been tampered with — which also ensures it was issued by our system — and
-    // /// will also ensure that the token is not expired.
-    // pub fn from_jwt<'a>(jwt: &'a str, pub_key: &'a str) -> Result<Claims, Error> {
-    //     // Decode token & extract claims.
-    //     let claims = match decode::<Claims>(jwt, pub_key) {
-    //         Ok(t) => t,
-    //         Err(err) => {
-    //             error!("Error decoding JWT. {}", err);
-    //             return Err(Error::new("Unauthorized. Invalid credentials provided.", 401, None));
-    //         },
-    //     };
+    /// Extract JWT claims from the given request.
+    pub async fn from_request<'a>(request: &'a HttpRequest, pub_key: &'a jwt::DecodingKey<'static>) -> Result<Self, Error> {
+        // Extract auth val from header.
+        let authval = match request.headers().get("authorization") {
+            Some(val) => match val.to_str() {
+                Ok(strval) => strval,
+                Err(_) => return Err(Error::new("Invalid contents of header 'Authorization'.".into(), 401, None)),
+            }
+            // No auth header presented.
+            None => return Err(Error::new("No credentials provided in request.".into(), 401, None)),
+        };
 
-    //     // Ensure the claims are valid.
-    //     match claims.must_not_be_expired() {
-    //         Ok(_) => Ok(claims),
-    //         Err(err) => Err(err),
-    //     }
-    // }
+        // Evaluate token's presented auth scheme.
+        let mut token_segments = authval.splitn(2, " ");
+        let is_schema_valid = match token_segments.next() {
+            Some(scheme) if scheme.to_lowercase() == "bearer" => {
+                true
+            }
+            _ => false,
+        };
+        if !is_schema_valid {
+            return Err(Error::new("Invalid authorization scheme specified, must be 'bearer'.".into(), 401, None));
+        }
 
-    // /// Validate that the given claims have not expired.
-    // ///
-    // /// This routine is private, as it only needs to be called when the `Claims` object
-    // /// is initially extracted from its JWT.
-    // fn must_not_be_expired(&self) -> Result<(), Error> {
-    //     if Utc::now().timestamp() > self.exp {
-    //         Err(Error::new("Unauthorized. Given credentials have expired.", 401, None))
-    //     } else {
-    //         Ok(())
-    //     }
-    // }
+        // Scheme is good, now ensure we have a token with non-zero size.
+        let token = match token_segments.next() {
+            Some(token) => token,
+            None => return Err(Error::new("Invalid authorization token specified. It appears to be zero-size.".into(), 401, None)),
+        };
+
+        // Extract claims.
+        Ok(Self::from_jwt(&token, pub_key)?)
+    }
+
+    /// Attempt to extract a claims body from the given JWT.
+    ///
+    /// This routine will check the veracity of the token's signature, ensuring the token
+    /// has not been tampered with, and that the token is not expired.
+    pub fn from_jwt<'a>(jwt: &'a str, pub_key: &'a jwt::DecodingKey<'static>) -> Result<Self, Error> {
+        // Decode token & extract claims.
+        let claims = match jwt::decode::<Self>(jwt, pub_key, &jwt::Validation::new(jwt::Algorithm::RS512)) {
+            Ok(t) => t.claims,
+            Err(err) => Err(Error::new_invalid_token())?,
+        };
+
+        // Ensure the claims are valid.
+        claims.must_not_be_expired()?;
+        Ok(claims)
+    }
+
+    /// Validate that the given claims have not expired.
+    fn must_not_be_expired(&self) -> Result<(), Error> {
+        let now = Utc::now().timestamp();
+        if now > self.exp {
+            Err(Error::new_token_expired())
+        } else {
+            Ok(())
+        }
+    }
 }

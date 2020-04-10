@@ -27,7 +27,7 @@ pub enum Response<D> {
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct GiphyGif {
     /// The ID of the GIF in Giphy.
-    pub id: i64,
+    pub id: String,
     /// The title of the GIF.
     pub title: String,
     /// The URL of the GIF.
