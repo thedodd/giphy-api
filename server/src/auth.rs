@@ -99,7 +99,7 @@ impl Claims {
         // Decode token & extract claims.
         let claims = match jwt::decode::<Self>(jwt, pub_key, &jwt::Validation::new(jwt::Algorithm::RS512)) {
             Ok(t) => t.claims,
-            Err(err) => Err(Error::new_invalid_token())?,
+            Err(_) => Err(Error::new_invalid_token())?,
         };
 
         // Ensure the claims are valid.

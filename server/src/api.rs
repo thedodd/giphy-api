@@ -5,7 +5,6 @@ use actix_web::{App, HttpServer};
 use actix_web::web::{self, Data, HttpRequest};
 use actix_web::Result;
 use bytes::Bytes;
-use futures::prelude::*;
 use reqwest::Client;
 use serde::{Serialize, Deserialize};
 use sqlx::PgPool;
@@ -158,28 +157,84 @@ async fn search_giphy(hreq: HttpRequest, body: Bytes, state: Data<State>) -> Res
     Ok(Response::Data(SearchGiphyResponse{gifs: response_gifs}))
 }
 
-async fn save_gif(hreq: HttpRequest, _body: Bytes, state: Data<State>) -> Result<Response<SaveGifResponse>> {
+async fn save_gif(hreq: HttpRequest, body: Bytes, state: Data<State>) -> Result<Response<SaveGifResponse>> {
     let span = tracing::info_span!("/api/save_gif");
     let _span = span.enter();
+
+    // Extract claims from request & fetch the corresponding user.
     let claims = auth::Claims::from_request(&hreq, &state.config.decoding_key).await?;
-    // Save the gif by gif ID & user ID.
-    unimplemented!()
+    let mut tx = state.db.begin().await.map_err(Error::from)?;
+    let user = match models::User::find_by_id(claims.sub, &mut tx).await? {
+        Some(user) => user,
+        None => Err(Error::new_invalid_credentials())?,
+    };
+    let req: SaveGifRequest = serde_json::from_slice(&body).map_err(Error::new_deser_err)?;
+
+    // Fetch the target GIF from the Giphy API.
+    let giphy_res = state.client.get(&format!("{}/{}", GIPHY_ID_URL, &req.id))
+        .query(&[("api_key", state.config.giphy_api_key.as_str())])
+        .send().await.map_err(|err| {
+            tracing::error!("{}", err);
+            Error::new_ise()
+        })?
+        .json::<GiphySearchResponse<Option<GiphySearchGif>>>().await.map_err(|err| {
+            tracing::error!("{}", err);
+            Error::new_ise()
+        })?;
+
+    // Unpack response option.
+    let gif = match giphy_res.data {
+        Some(gif) => GiphyGif{
+            id: gif.id, title: gif.title, is_saved: true, // About to save.
+            url: gif.images.fixed_height_downsampled.url,
+            category: None,
+        },
+        None => Err(Error::new("Specified GIF does not seem to exist in Gipy.", 400, None))?,
+    };
+    let _ = models::SavedGif::insert(user.id, &gif, &mut tx).await?;
+    tx.commit().await.map_err(Error::from)?;
+    Ok(Response::Data(SaveGifResponse{gif}))
 }
 
-async fn favorites(hreq: HttpRequest, _body: Bytes, state: Data<State>) -> Result<Response<FetchFavoritesResponse>> {
+async fn favorites(hreq: HttpRequest, body: Bytes, state: Data<State>) -> Result<Response<FetchFavoritesResponse>> {
     let span = tracing::info_span!("/api/favorites");
     let _span = span.enter();
+
+    // Extract claims from request & fetch the corresponding user.
     let claims = auth::Claims::from_request(&hreq, &state.config.decoding_key).await?;
-    // Just find all gifs saved/favorited by the user by ID.
-    unimplemented!()
+    let mut db = state.db.acquire().await.map_err(Error::from)?;
+    let user = match models::User::find_by_id(claims.sub, &mut db).await? {
+        Some(user) => user,
+        None => Err(Error::new_invalid_credentials())?,
+    };
+    let _: FetchFavoritesRequest = serde_json::from_slice(&body).map_err(Error::new_deser_err)?;
+
+    // Find all gifs saved/favorited by the user by ID.
+    let gifs = models::SavedGif::all_for_user(user.id, &mut db).await?
+        .into_iter().map(From::from).collect();
+    Ok(Response::Data(FetchFavoritesResponse{gifs}))
 }
 
-async fn categorize(hreq: HttpRequest, _body: Bytes, state: Data<State>) -> Result<Response<CategorizeGifResponse>> {
+async fn categorize(hreq: HttpRequest, body: Bytes, state: Data<State>) -> Result<Response<CategorizeGifResponse>> {
     let span = tracing::info_span!("/api/categorize");
     let _span = span.enter();
+
+    // Extract claims from request & fetch the corresponding user.
     let claims = auth::Claims::from_request(&hreq, &state.config.decoding_key).await?;
+    let mut tx = state.db.begin().await.map_err(Error::from)?;
+    let user = match models::User::find_by_id(claims.sub, &mut tx).await? {
+        Some(user) => user,
+        None => Err(Error::new_invalid_credentials())?,
+    };
+    let req: CategorizeGifRequest = serde_json::from_slice(&body).map_err(Error::new_deser_err)?;
+
     // Set a new value for the gif previously saved by the user.
-    unimplemented!()
+    let gif = match models::SavedGif::set_category(user.id, req.id, req.category, &mut tx).await? {
+        Some(gif) => gif.into(),
+        None => Err(Error::new("Target GIF does not exist for the requesting user.", 400, None))?,
+    };
+    tx.commit().await.map_err(Error::from)?;
+    Ok(Response::Data(CategorizeGifResponse{gif}))
 }
 
 #[derive(Deserialize, Serialize)]

@@ -1,9 +1,8 @@
 use std::collections::HashMap;
 
 use futures::prelude::*;
-use futures::stream::{TryStream, TryStreamExt};
 
-use common::Error;
+use common::{Error, GiphyGif};
 use crate::{Tx, PgPoolConn};
 
 //////////////////////////////////////////////////////////////////////////////////////////////////
@@ -27,7 +26,31 @@ pub struct SavedGif {
 }
 
 impl SavedGif {
+    /// Insert a new record.
+    pub async fn insert(user: i64, gif: &GiphyGif, tx: &mut Tx) -> Result<Self, Error> {
+        Ok(sqlx::query_as!(
+            SavedGif,
+            r#"INSERT INTO public.saved_gifs ("user", giphy_id, title, url, category) VALUES ($1, $2, $3, $4, $5) RETURNING *;"#,
+            user, gif.id.clone(), gif.title.clone(), gif.url.clone(), gif.category.clone(),
+        )
+        .fetch_one(tx)
+        .await
+        .map_err(Error::from)?)
+    }
+
     /// Find all gifs saved by the specified user.
+    pub async fn all_for_user(user: i64, db: &mut PgPoolConn) -> Result<Vec<SavedGif>, Error> {
+        let stream = sqlx::query_as!(SavedGif, r#"SELECT * FROM public.saved_gifs WHERE "user"=$1;"#, user).fetch(db);
+        Ok(stream
+            .try_fold(vec![], |mut acc, gif| async move {
+                acc.push(gif);
+                Ok(acc)
+            })
+            .map_err(Error::from)
+            .await?)
+    }
+
+    /// Find all gifs saved by the specified user matching the set of IDs.
     pub async fn for_user_matching_ids<'a>(user: i64, ids: &'a [String], db: &'a mut PgPoolConn) -> Result<HashMap<String, SavedGif>, Error> {
         let stream = sqlx::query_as!(SavedGif, r#"SELECT * FROM public.saved_gifs WHERE "user"=$1 AND giphy_id=ANY($2);"#, user, ids)
             .fetch(db);
@@ -38,6 +61,30 @@ impl SavedGif {
             })
             .map_err(Error::from)
             .await?)
+    }
+
+    /// Set a new category for the target user's gif, returning None if the target gif does not exist for the given user.
+    pub async fn set_category(user: i64, gif: String, category: String, tx: &mut Tx) -> Result<Option<Self>, Error> {
+        Ok(sqlx::query_as!(
+            SavedGif,
+            r#"UPDATE public.saved_gifs SET category=$1 WHERE "user"=$2 AND giphy_id=$3 RETURNING *;"#,
+            category, user, gif,
+        )
+        .fetch_optional(tx)
+        .await
+        .map_err(Error::from)?)
+    }
+}
+
+impl From<SavedGif> for GiphyGif {
+    fn from(src: SavedGif) -> Self {
+        Self{
+            id: src.giphy_id,
+            title: src.title,
+            url: src.url,
+            is_saved: true,
+            category: src.category,
+        }
     }
 }
 

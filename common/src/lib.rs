@@ -110,7 +110,7 @@ pub struct SaveGifResponse {
 
 /// A request to fetch the caller's saved GIFs.
 #[derive(Debug, Deserialize, Serialize, Clone)]
-pub struct FetchFavoritesRequest;
+pub struct FetchFavoritesRequest {}
 
 /// The response to a request to fetch the caller's saved GIFs.
 #[derive(Debug, Deserialize, Serialize, Clone)]
