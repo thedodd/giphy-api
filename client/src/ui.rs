@@ -1,8 +1,6 @@
 use seed::prelude::*;
 
-use crate::{
-    state::{Model, ModelEvent},
-};
+use crate::state::{Model, ModelEvent};
 
 /// An enumeration of the possible UI update events.
 #[derive(Clone)]
@@ -12,11 +10,10 @@ pub enum UIStateEvent {
 
 impl UIStateEvent {
     /// The reducer for this state model.
-    pub fn reducer(event: Self, mut model: &mut Model) -> Update<ModelEvent> {
+    pub fn reducer(event: Self, mut model: &mut Model, _: &mut impl Orders<ModelEvent>) {
         match event {
             UIStateEvent::ToggleNavbar => {
                 model.ui.is_navbar_burger_active = !model.ui.is_navbar_burger_active;
-                Render.into()
             }
         }
     }

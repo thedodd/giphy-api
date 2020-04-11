@@ -5,8 +5,7 @@ use common::{
     SaveGifRequest, SaveGifResponse,
     SearchGiphyRequest, SearchGiphyResponse,
 };
-use futures::prelude::*;
-use seed::prelude::*;
+use seed::{*, prelude::*};
 
 use crate::{
     api,
@@ -51,11 +50,10 @@ pub enum SearchContainerEvent {
 
 impl SearchContainerEvent {
     /// The reducer for this state model.
-    pub fn reducer(event: SearchContainerEvent, mut model: &mut Model) -> Update<ModelEvent> {
+    pub fn reducer(event: SearchContainerEvent, mut model: &mut Model, orders: &mut impl Orders<ModelEvent>) {
         match event {
             SearchContainerEvent::UpdateSearchField(val) => {
                 model.search.search = val;
-                Render.into()
             }
             SearchContainerEvent::SubmitSearch => match &model.user {
                 Some(user) => {
@@ -63,52 +61,71 @@ impl SearchContainerEvent {
                     model.search.search_results.clear();
                     model.search.has_search_request = true;
                     let payload = SearchGiphyRequest{query: model.search.search.clone()};
-                    Update::with_future_msg(api::search(payload, user.jwt.clone())
-                        .map(|r| ModelEvent::Search(SearchContainerEvent::SearchSuccess(r)))
-                        .map_err(|e| ModelEvent::Search(SearchContainerEvent::SearchError(e))))
+                    let jwt = user.jwt.clone();
+                    orders.perform_cmd(async move {
+                        api::search(payload, jwt).await
+                            .map(|data| ModelEvent::Search(SearchContainerEvent::SearchSuccess(data)))
+                            .map_err(|err| ModelEvent::Search(SearchContainerEvent::SearchError(err)))
+                    });
                 }
-                None => Update::with_msg(ModelEvent::Logout),
+                None => {
+                    orders.send_msg(ModelEvent::Logout);
+                }
             }
             SearchContainerEvent::SearchSuccess(res) => {
                 model.search.has_search_request = false;
                 res.gifs.into_iter().for_each(|gif| { model.search.search_results.insert(gif.id.clone(), gif); });
-                Render.into()
             }
             SearchContainerEvent::SearchError(err) => {
                 model.search.has_search_request = false;
-                handle_common_errors(&err).unwrap_or_else(|| {
-                    model.search.search_error = Some(err.description);
-                    Render.into()
-                })
+                match handle_common_errors(&err) {
+                    Some(event) => {
+                        orders.send_msg(event);
+                    }
+                    None => {
+                        model.search.search_error = Some(err.description);
+                    }
+                }
             }
             SearchContainerEvent::SaveGif(gifid) => match &model.user {
                 Some(user) => {
                     model.search.gifs_being_saved.insert(gifid.clone());
                     let req = SaveGifRequest{id: gifid};
-                    Update::with_future_msg(api::save_gif(req, user.jwt.clone())
-                        .map(|r| ModelEvent::Search(SearchContainerEvent::SaveGifSuccess(r)))
-                        .map_err(|e| ModelEvent::Search(SearchContainerEvent::SaveGifError(e))))
+                    let jwt = user.jwt.clone();
+                    orders.perform_cmd(async move {
+                        api::save_gif(req, jwt).await
+                            .map(|data| ModelEvent::Search(SearchContainerEvent::SaveGifSuccess(data)))
+                            .map_err(|err| ModelEvent::Search(SearchContainerEvent::SaveGifError(err)))
+                    });
                 }
-                None => Update::with_msg(ModelEvent::Logout),
+                None => {
+                    orders.send_msg(ModelEvent::Logout);
+                }
             }
             SearchContainerEvent::SaveGifSuccess(res) => {
                 model.search.gifs_being_saved.remove(&res.gif.id);
                 model.search.search_results.insert(res.gif.id.clone(), res.gif.clone());
                 model.favorites.favorites.insert(res.gif.id.clone(), res.gif);
-                Render.into()
             }
             SearchContainerEvent::SaveGifError((id, err)) => {
                 model.search.gifs_being_saved.remove(&id);
-                handle_common_errors(&err).unwrap_or(Skip.into())
+                match handle_common_errors(&err) {
+                    Some(event) => {
+                        orders.send_msg(event);
+                    }
+                    None => {
+                        orders.skip();
+                    }
+                }
             }
         }
     }
 }
 
 /// The search view.
-pub fn search(model: &Model) -> El<ModelEvent> {
+pub fn search(model: &Model) -> Node<ModelEvent> {
     let mut search_input_attrs = attrs!{
-        At::Value => model.search.search; At::Class => "input"; At::PlaceHolder => "Search for GIFs";
+        At::Value => model.search.search; At::Class => "input"; At::Placeholder => "Search for GIFs";
     };
     let mut submit_button_attrs = attrs!{At::Class => "button"};
     let is_searching = model.search.has_search_request;
@@ -119,7 +136,7 @@ pub fn search(model: &Model) -> El<ModelEvent> {
     if !is_searching && model.search.search.len() == 0 {
         submit_button_attrs.add(At::Disabled, "true");
     }
-    let spinner: El<ModelEvent> = match is_searching {
+    let spinner = match is_searching {
         true => span!(class!("icon ml-1"), i!(attrs!(At::Class => "fas fa-spinner fa-pulse"))),
         false => b!(""),
     };
@@ -139,6 +156,10 @@ pub fn search(model: &Model) -> El<ModelEvent> {
                             p!(attrs!{At::Class => "control is-expanded"},
                                 input!(search_input_attrs,
                                     input_ev(Ev::Input, |val| ModelEvent::Search(SearchContainerEvent::UpdateSearchField(val))),
+                                    keyboard_ev("keydown", |ev| match ev.key().as_str() {
+                                        "Enter" => ModelEvent::Search(SearchContainerEvent::SubmitSearch),
+                                        _ => ModelEvent::Noop,
+                                    }),
                                 ),
                             ),
                             p!(attrs!{At::Class => "control"},

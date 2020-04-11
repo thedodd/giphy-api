@@ -1,6 +1,3 @@
-#[macro_use]
-extern crate seed;
-
 mod api;
 mod components;
 mod containers;
@@ -12,21 +9,17 @@ mod utils;
 use common::User;
 use seed::{prelude::*, App};
 
-use crate::{
-    state::{update, Model, ModelEvent},
-    containers::app,
-};
-
-/// A type alias for more easily referring to our application state system.
-pub type AppState = App<ModelEvent, Model>;
+use crate::containers::app;
+use crate::state::{update, Model, ModelEvent};
 
 #[wasm_bindgen]
 pub fn start() {
-    log!("Booting client application.");
+    seed::log!("Booting client application.");
     let mut model = Model::default();
     model.is_initializing = true;
-    let app = App::build(model, update, app)
-        .routes(router::router).finish().run();
+    let app = App::builder(update, app)
+        .routes(router::router)
+        .build_and_start();
 
     // Attempt to load any session data.
     match utils::get_session_item("user") {

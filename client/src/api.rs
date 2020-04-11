@@ -7,15 +7,12 @@ use common::{
     SaveGifRequest, SaveGifResponse,
     SearchGiphyRequest, SearchGiphyResponse,
 };
-use futures::prelude::*;
 use lazy_static::lazy_static;
 use seed::{Method, Request};
-use web_sys::console::log_1;
+use seed::fetch::FailReason;
+use serde::{Serialize, de::DeserializeOwned};
 
 const AUTHZ: &str = "authorization";
-const CTYPE: &str = "content-type";
-const APP_JSON: &str = "application/json";
-const FUT_ERROR: &str = "Error from request to API.";
 
 lazy_static! {
     static ref BASE_URL: String = {
@@ -32,72 +29,69 @@ lazy_static! {
 }
 
 /// Submit a login request.
-pub fn login(req: LoginRequest) -> impl Future<Item=LoginResponse, Error=Error> {
-    Request::new(&*LOGIN_URL).method(Method::Post).header(CTYPE, APP_JSON)
-        .body_json(&req).fetch_json().map_err(|err| {
-            log_1(&err);
-            Error::new(FUT_ERROR, 500, None)
-        }).then(flatten_payload)
+pub async fn login(req: LoginRequest) -> Result<LoginResponse, Error> {
+    api_post(LOGIN_URL.to_string(), req, None).await
 }
 
 /// Submit a register request.
-pub fn register(req: RegisterRequest) -> impl Future<Item=RegisterResponse, Error=Error> {
-    Request::new(&*REGISTER_URL).method(Method::Post).header(CTYPE, APP_JSON)
-        .body_json(&req).fetch_json().map_err(|err| {
-            log_1(&err);
-            Error::new(FUT_ERROR, 500, None)
-        }).then(flatten_payload)
+pub async fn register(req: RegisterRequest) -> Result<RegisterResponse, Error> {
+    api_post(REGISTER_URL.to_string(), req, None).await
 }
 
 /// Submit a search giphy request.
-pub fn search(req: SearchGiphyRequest, jwt: String) -> impl Future<Item=SearchGiphyResponse, Error=Error> {
-    Request::new(&*SEARCH_URL).method(Method::Post)
-        .header(CTYPE, APP_JSON).header(AUTHZ, &format!("bearer {}", jwt))
-        .body_json(&req).fetch_json().map_err(|err| {
-            log_1(&err);
-            Error::new(FUT_ERROR, 500, None)
-        }).then(flatten_payload)
+pub async fn search(req: SearchGiphyRequest, jwt: String) -> Result<SearchGiphyResponse, Error> {
+    api_post(SEARCH_URL.to_string(), req, Some(jwt)).await
 }
 
 /// Submit a save GIF request.
-pub fn save_gif(req: SaveGifRequest, jwt: String) -> impl Future<Item=SaveGifResponse, Error=(String, Error)> {
-    Request::new(&*SAVE_GIF_URL).method(Method::Post)
-        .header(CTYPE, APP_JSON).header(AUTHZ, &format!("bearer {}", jwt))
-        .body_json(&req).fetch_json().map_err(|err| {
-            log_1(&err);
-            Error::new(FUT_ERROR, 500, None)
-        }).then(flatten_payload)
-        .map_err(move |err| (req.id.clone(), err))
+pub async fn save_gif(req: SaveGifRequest, jwt: String) -> Result<SaveGifResponse, (String, Error)> {
+    let gifid = req.id.clone();
+    api_post(SAVE_GIF_URL.to_string(), req, Some(jwt))
+        .await
+        .map_err(move |err| (gifid, err))
 }
 
 /// Submit a request to fetch the caller's saved GIFs.
-pub fn favorites(req: FetchFavoritesRequest, jwt: String) -> impl Future<Item=FetchFavoritesResponse, Error=Error> {
-    Request::new(&*FAVORITES_URL).method(Method::Post)
-        .header(CTYPE, APP_JSON).header(AUTHZ, &format!("bearer {}", jwt))
-        .body_json(&req).fetch_json().map_err(|err| {
-            log_1(&err);
-            Error::new(FUT_ERROR, 500, None)
-        }).then(flatten_payload)
+pub async fn favorites(req: FetchFavoritesRequest, jwt: String) -> Result<FetchFavoritesResponse, Error> {
+    api_post(FAVORITES_URL.to_string(), req, Some(jwt)).await
 }
 
 /// Submit a request to categorize a GIF.
-pub fn categorize(req: CategorizeGifRequest, jwt: String) -> impl Future<Item=CategorizeGifResponse, Error=(String, Error)> {
-    Request::new(&*CATG_URL).method(Method::Post)
-        .header(CTYPE, APP_JSON).header(AUTHZ, &format!("bearer {}", jwt))
-        .body_json(&req).fetch_json().map_err(|err| {
-            log_1(&err);
-            Error::new(FUT_ERROR, 500, None)
-        }).then(flatten_payload)
-        .map_err(move |err| (req.id.clone(), err))
+pub async fn categorize(req: CategorizeGifRequest, jwt: String) -> Result<CategorizeGifResponse, (String, Error)> {
+    let gifid = req.id.clone();
+    api_post(CATG_URL.to_string(), req, Some(jwt))
+        .await
+        .map_err(move |err| (gifid, err))
 }
 
-/// Flatten the result of an API response.
-fn flatten_payload<D>(outer: Result<Response<D>, Error>) -> Result<D, Error> {
-    match outer {
-        Ok(inner) => match inner {
+pub async fn api_post<T, D>(url: String, req: T, jwt: Option<String>) -> Result<D, Error>
+    where
+        T: Serialize,
+        D: DeserializeOwned + std::fmt::Debug + 'static,
+{
+    let mut builder = Request::new(url).method(Method::Post);
+    if let Some(jwt) = jwt {
+        builder = builder.header(AUTHZ, &format!("bearer {}", jwt))
+    }
+    builder
+        .send_json(&req)
+        .fetch_json_data(std::convert::identity)
+        .await
+        // Flatten fetch util's inner result type.
+        .unwrap_or_else(|res| res)
+        // Handle errors related to API interfacing.
+        .map_err(|err| {
+            seed::log!("Error during request to API. {:?}", err);
+            match err {
+                // TODO: update these error conditions.
+                FailReason::RequestError(_, _) => Error::new("", 500, None),
+                FailReason::Status(_, _) => Error::new("", 500, None),
+                FailReason::DataError(_, _) => Error::new("", 500, None),
+            }
+        })
+        // Unpack inner response type.
+        .and_then(|res: Response<D>| match res {
             Response::Data(data) => Ok(data),
             Response::Error(err) => Err(err),
-        }
-        Err(err) => Err(err),
-    }
+        })
 }

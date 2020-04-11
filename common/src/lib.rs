@@ -1,8 +1,12 @@
-use std::collections::HashMap;
+mod error;
 
-use serde_derive::{Deserialize, Serialize};
+#[cfg(feature="server")]
+use actix_web::{HttpRequest, HttpResponse, Responder, http::StatusCode};
+use serde::{Deserialize, Serialize};
 use validator::{Validate};
 use validator_derive::Validate;
+
+pub use crate::error::Error;
 
 //////////////////////////////////////////////////////////////////////////////////////////////////
 // Common Components /////////////////////////////////////////////////////////////////////////////
@@ -12,39 +16,11 @@ use validator_derive::Validate;
 #[serde(tag="result", content="payload")]
 pub enum Response<D> {
     /// A success payload with data.
+    #[serde(rename="data")]
     Data(D),
-
     /// An error payload with an error.
+    #[serde(rename="error")]
     Error(Error),
-}
-
-/// An error coming form the API.
-#[derive(Debug, Deserialize, Serialize, Clone)]
-pub struct Error {
-    /// A description of the error.
-    pub description: String,
-
-    /// The HTTP status code which represents this type of error.
-    pub status: u32,
-
-    /// Error information specific to fields of the domain request.
-    pub fields: HashMap<String, String>,
-}
-
-impl Error {
-    const ISE: &'static str = "Internal server error.";
-
-    /// Create a new instance.
-    pub fn new(desc: &str, status: u32, fields: Option<HashMap<String, String>>) -> Self {
-        let description = desc.to_string();
-        let fields = fields.unwrap_or_default();
-        Error{description, status, fields}
-    }
-
-    /// Create a new instance representing an internal server error.
-    pub fn new_ise() -> Self {
-        Self::new(Self::ISE, 500, None)
-    }
 }
 
 /// A GIF from the Giphy API.
@@ -52,16 +28,12 @@ impl Error {
 pub struct GiphyGif {
     /// The ID of the GIF in Giphy.
     pub id: String,
-
     /// The title of the GIF.
     pub title: String,
-
     /// The URL of the GIF.
     pub url: String,
-
     /// A bool indicating if the calling user has already saved this GIF.
     pub is_saved: bool,
-
     /// The optional category for this GIF.
     ///
     /// NB: This does not come from Giphy, this comes from our DB.
@@ -71,7 +43,7 @@ pub struct GiphyGif {
 /// A user of the system.
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct User {
-    pub id: String,
+    pub id: i64,
     pub email: String,
     pub jwt: String,
 }
@@ -87,7 +59,7 @@ pub struct User {
 pub struct RegisterRequest {
     #[validate(email(message="Must provide a valid email address."))]
     pub email: String,
-    #[validate(length(min="6", message="Password must be at least 6 characters in length."))]
+    #[validate(length(min=6, message="Password must be at least 6 characters in length."))]
     pub password: String,
 }
 
@@ -138,7 +110,7 @@ pub struct SaveGifResponse {
 
 /// A request to fetch the caller's saved GIFs.
 #[derive(Debug, Deserialize, Serialize, Clone)]
-pub struct FetchFavoritesRequest;
+pub struct FetchFavoritesRequest {}
 
 /// The response to a request to fetch the caller's saved GIFs.
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -151,7 +123,6 @@ pub struct FetchFavoritesResponse {
 pub struct CategorizeGifRequest {
     /// The ID of the GIF to update.
     pub id: String,
-
     /// The new category to apply.
     pub category: String,
 }
@@ -160,4 +131,21 @@ pub struct CategorizeGifRequest {
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct CategorizeGifResponse {
     pub gif: GiphyGif,
+}
+
+#[cfg(feature="server")]
+impl<T> Responder for Response<T> where T: Serialize {
+    type Future = futures::future::Ready<Result<HttpResponse, <Self as Responder>::Error>>;
+    type Error = actix_web::Error;
+
+    fn respond_to(self, _: &HttpRequest) -> Self::Future {
+        match &self {
+            Self::Data(_) => futures::future::ready(Ok(HttpResponse::Ok().json(self))),
+            Self::Error(err) => {
+                let status = StatusCode::from_u16(err.status)
+                    .unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);
+                futures::future::ready(Ok(HttpResponse::build(status).json(self)))
+            }
+        }
+    }
 }

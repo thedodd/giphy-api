@@ -1,19 +1,16 @@
 use std::borrow::Cow;
 
 use common::Error;
-use seed::prelude::*;
 use web_sys::Storage;
 
-use crate::{
-    state::ModelEvent,
-};
+use crate::state::ModelEvent;
 
 /// A method for handling common errors.
 ///
 /// If an update is returned, it should be used; else, the caller will need to handle the error.
-pub fn handle_common_errors(err: &Error) -> Option<Update<ModelEvent>> {
+pub fn handle_common_errors(err: &Error) -> Option<ModelEvent> {
     match err.status {
-        401 => Some(Update::with_msg(ModelEvent::Logout)),
+        401 => Some(ModelEvent::Logout),
         _ => None,
     }
 }
@@ -45,7 +42,7 @@ pub fn del_session_item(key: &str) {
     let _ = get_session_storage()
         .map_err(|_| ())
         .and_then(|s| s.remove_item(key).map_err(|err| {
-            log!(format!("Failed to remove session storage key '{}': {:?}", key, err));
+            seed::log!(format!("Failed to remove session storage key '{}': {:?}", key, err));
         }));
 }
 

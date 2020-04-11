@@ -5,24 +5,22 @@ authors = ["Anthony Dodd <dodd.anthonyjosiah@gmail.com>"]
 edition = "2018"
 
 [dependencies]
-actix = "0.7"
-actix-net = "0.2"
-actix-web = "0.7"
-base64 = "0.10"
-bcrypt = "0.3"
+actix-files = "0.2.1"
+actix-rt = "1"
+actix-web = { version = "2", features=["rustls"] }
+base64 = "0.12"
+bcrypt = "0.7"
+bytes = "0.5.4"
 chrono = "0.4"
-common = { path="../common" }
-env_logger = "0.5"
+common = { path="../common", features=["server"] }
+dotenv = "0.15.0"
 envy = "0.4"
-futures = "0.1"
-log = "0.4"
-mongodb = "0.3"
-reqwest = "0.9"
-serde = "1.0"
-serde_derive = "1.0"
-serde_json = "1.0"
-simple_jwt = "1.2"
-time = "0.1"
-validator = "0.8"
-wither = "0.8"
-wither_derive = "0.8"
+futures = "0.3"
+jsonwebtoken = "7"
+reqwest = { version="0.10", default-features=false, features=["json", "rustls-tls"] }
+serde = { version="1.0", features=["derive"] }
+serde_json = "1"
+sqlx = { version="0.3.3", default-features=false, features=["postgres", "macros", "runtime-tokio"] }
+tracing = "0.1"
+tracing-subscriber = "0.2"
+validator = "0.10"

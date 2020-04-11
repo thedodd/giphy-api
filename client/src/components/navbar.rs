@@ -1,4 +1,4 @@
-use seed::prelude::*;
+use seed::{*, prelude::*};
 
 use crate::{
     router::Route,
@@ -7,7 +7,7 @@ use crate::{
 };
 
 /// The navbar component.
-pub fn navbar(model: &Model) -> El<ModelEvent> {
+pub fn navbar(model: &Model) -> Node<ModelEvent> {
     let mut navburger_attrs = attrs!("role" => "button"; "aria-label" => "menu"; "aria-expanded" => "false");
     let mut navmenu_attrs = attrs!();
     if model.ui.is_navbar_burger_active {
@@ -48,7 +48,7 @@ pub fn navbar(model: &Model) -> El<ModelEvent> {
     )
 }
 
-fn build_search_link(route: &Route) -> El<ModelEvent> {
+fn build_search_link(route: &Route) -> Node<ModelEvent> {
     let mut attrs = attrs!(At::Class => "button is-dark"; At::Href => "/ui/search");
     if let Route::Search = route {
         attrs.add(At::Disabled, "true");
@@ -56,7 +56,7 @@ fn build_search_link(route: &Route) -> El<ModelEvent> {
     a!(attrs, "Search")
 }
 
-fn build_favorites_link(route: &Route) -> El<ModelEvent> {
+fn build_favorites_link(route: &Route) -> Node<ModelEvent> {
     let mut attrs = attrs!(At::Class => "button is-dark"; At::Href => "/ui/favorites");
     if let Route::Favorites = route {
         attrs.add(At::Disabled, "true");

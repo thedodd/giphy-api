@@ -4,3 +4,5 @@ target
 # File Ignores #
 static/*
 !static/.gitkeep
+!static/index.html
+!static/index.css
