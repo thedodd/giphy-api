@@ -10,7 +10,7 @@ The client app is a WebAssembly (WASM) application built using Rust & the [Seed 
 We are using Postgres for data storage & [launchbadge/sqlx](https://github.com/launchbadge/sqlx) for the interface.
 
 #### setup
-First, you'll need Rust. Head on over to https://rustup.rs/ and follow the instructions there to setup the Rust toolchain. As we are building our Rust code to target the WASM instruction set, and now that we have `rustup` on our machine, let's add the needed compiler target:
+First, you'll need Rust. Head on over to [rustup.rs](https://rustup.rs/) and follow the instructions there to setup the Rust toolchain. After that, let's also add the needed compiler target for the WASM instruction set:
 
 ```bash
 # Add the WASM 32-bit instruction set as a compilation target.
