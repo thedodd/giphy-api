@@ -156,6 +156,10 @@ pub fn search(model: &Model) -> Node<ModelEvent> {
                             p!(attrs!{At::Class => "control is-expanded"},
                                 input!(search_input_attrs,
                                     input_ev(Ev::Input, |val| ModelEvent::Search(SearchContainerEvent::UpdateSearchField(val))),
+                                    keyboard_ev("keydown", |ev| match ev.key().as_str() {
+                                        "Enter" => ModelEvent::Search(SearchContainerEvent::SubmitSearch),
+                                        _ => ModelEvent::Noop,
+                                    }),
                                 ),
                             ),
                             p!(attrs!{At::Class => "control"},

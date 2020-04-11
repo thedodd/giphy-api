@@ -20,6 +20,10 @@
     margin: 0 !important;
 }
 
+.Search .Search-images .image img {
+    max-height: 200px;
+}
+
 .Search .Search-images .box .media {
     min-width: 3rem;
 }
