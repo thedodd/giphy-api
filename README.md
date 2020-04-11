@@ -5,7 +5,7 @@ A WebAssembly application that allows a user to search for and save animated GIF
 ### overview
 The API is structured as a very simple JSON RPC API built using [actix.rs](https://actix.rs/). The client & server use the same exact data models for communicating over the network. All interaction is protected by JWT authN/authZ.
 
-The client app is a WebAssembly (WASM) application built using Rust.
+The client app is a WebAssembly (WASM) application built using Rust & the [Seed framework](https://seed-rs.org).
 
 We are using Postgres for data storage & [launchbadge/sqlx](https://github.com/launchbadge/sqlx) for the interface.
 
@@ -16,7 +16,7 @@ First, you'll need Rust. Head on over to https://rustup.rs/ and follow the instr
 # Add the WASM 32-bit instruction set as a compilation target.
 rustup target add wasm32-unknown-unknown
 # While we're at it, let's install the wasm-bindgen-cli
-# which we will need for our WASM builds later.
+# which we will need for our WASM builds.
 cargo install wasm-bindgen-cli --version=0.2.55
 ```
 
