@@ -1,19 +1,17 @@
 use common::GiphyGif;
-use seed::prelude::*;
+use seed::{*, prelude::*};
 
-use crate::{
-    state::ModelEvent,
-};
+use crate::state::ModelEvent;
 
 /// A card displaying information on a Giphy GIF.
 pub fn gifcard(
     gif: &GiphyGif,
     catg_input: Option<&String>,
-    mut on_save: impl FnMut(String) -> ModelEvent + 'static,
-    mut on_remove: impl FnMut(String) -> ModelEvent + 'static,
-    mut on_update_category: impl FnMut(String, String) -> ModelEvent + 'static,
-    mut on_categorize: impl FnMut(String) -> ModelEvent + 'static,
-) -> El<ModelEvent> {
+    mut on_save: impl FnMut(String) -> ModelEvent + Clone + 'static,
+    mut on_remove: impl FnMut(String) -> ModelEvent + Clone + 'static,
+    mut on_update_category: impl FnMut(String, String) -> ModelEvent + Clone + 'static,
+    mut on_categorize: impl FnMut(String) -> ModelEvent + Clone + 'static,
+) -> Node<ModelEvent> {
 
     // Build closures.
     let (gid0, gid1, gid2, gid3) = (gif.id.clone(), gif.id.clone(), gif.id.clone(), gif.id.clone());
@@ -35,7 +33,7 @@ pub fn gifcard(
         .unwrap_or("");
     let mut input_attrs = attrs!(
         At::Class=>"input is-small is-rounded"; At::Value=>category_val;
-        At::Type=>"text"; At::PlaceHolder=>"Categorize...";
+        At::Type=>"text"; At::Placeholder=>"Categorize...";
     );
     if !is_saved {
         input_attrs.add(At::Disabled, "true");

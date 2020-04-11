@@ -3,16 +3,13 @@ use common::{
     LoginRequest, LoginResponse,
     RegisterRequest, RegisterResponse,
 };
-use futures::prelude::*;
-use seed::prelude::*;
+use seed::{*, prelude::*};
 use validator::{validate_email};
 
-use crate::{
-    api,
-    router::Route,
-    state::{Model, ModelEvent},
-    utils::{set_session_item}
-};
+use crate::api;
+use crate::router::Route;
+use crate::state::{Model, ModelEvent};
+use crate::utils::set_session_item;
 
 const NBSP: &str = " "; // Is not a space, it is an NBSP;
 const EMAIL_ERR: &str = "Must provide a valid email address.";
@@ -63,80 +60,82 @@ pub enum LoginContainerEvent {
 
 impl LoginContainerEvent {
     /// The reducer for this state model.
-    pub fn reducer(event: LoginContainerEvent, mut model: &mut Model) -> Update<ModelEvent> {
+    pub fn reducer(event: LoginContainerEvent, mut model: &mut Model, orders: &mut impl Orders<ModelEvent>) {
         match event {
             LoginContainerEvent::UpdateEmailField(email) => {
                 model.login.clear_errors();
                 model.login.email = email;
-                Render.into()
             }
             LoginContainerEvent::UpdatePWField(pw) => {
                 model.login.clear_errors();
                 model.login.pw = pw;
-                Render.into()
             }
             LoginContainerEvent::Login => {
                 model.login.clear_errors();
                 model.login.has_network_request = true;
                 let payload = LoginRequest{email: model.login.email.clone(), password: model.login.pw.clone()};
-                Update::with_future_msg(api::login(payload)
-                    .map(|r| ModelEvent::Login(LoginContainerEvent::LoginSuccess(r)))
-                    .map_err(|e| ModelEvent::Login(LoginContainerEvent::LoginError(e))))
+                orders.perform_cmd(async move {
+                    api::login(payload).await
+                        .map(|data| ModelEvent::Login(LoginContainerEvent::LoginSuccess(data)))
+                        .map_err(|err| ModelEvent::Login(LoginContainerEvent::LoginError(err)))
+                });
             }
             LoginContainerEvent::Register => {
                 // Validate current input before submitting.
                 if model.login.email_error.is_some() || model.login.pw_error.is_some() || model.login.has_network_request {
-                    return Skip.into()
+                    orders.skip();
+                    return
                 }
                 if !validate_email(&model.login.email) && model.login.email.len() > 0 {
                     model.login.email_error = Some(EMAIL_ERR);
-                    return Render.into();
+                    return
                 }
                 if model.login.pw.len() < 6 {
                     model.login.pw_error = Some(PASSWD_ERR);
-                    return Render.into();
+                    return
                 }
 
                 // Evertying is ready to rock, so submit the registration request.
                 model.login.clear_errors();
                 model.login.has_network_request = true;
                 let payload = RegisterRequest{email: model.login.email.clone(), password: model.login.pw.clone()};
-                Update::with_future_msg(api::register(payload)
-                    .map(|r| ModelEvent::Login(LoginContainerEvent::RegisterSuccess(r)))
-                    .map_err(|e| ModelEvent::Login(LoginContainerEvent::RegisterError(e))))
+                orders.perform_cmd(async move {
+                    api::register(payload).await
+                        .map(|data| ModelEvent::Login(LoginContainerEvent::RegisterSuccess(data)))
+                        .map_err(|err| ModelEvent::Login(LoginContainerEvent::RegisterError(err)))
+                });
             }
-            LoginContainerEvent::LoginSuccess(res) => Self::handle_creds_response(res.0, model),
-            LoginContainerEvent::RegisterSuccess(res) => Self::handle_creds_response(res.0, model),
+            LoginContainerEvent::LoginSuccess(res) => Self::handle_creds_response(res.0, model, orders),
+            LoginContainerEvent::RegisterSuccess(res) => Self::handle_creds_response(res.0, model, orders),
             LoginContainerEvent::LoginError(err) => Self::handle_error(err, model),
             LoginContainerEvent::RegisterError(err) => Self::handle_error(err, model),
         }
     }
 
-    fn handle_error(err: Error, mut model: &mut Model) -> Update<ModelEvent> {
+    fn handle_error(err: Error, mut model: &mut Model) {
         model.login.has_network_request = false;
         model.login.network_error = Some(err);
-        Render.into()
     }
 
-    fn handle_creds_response(user: User, mut model: &mut Model) -> Update<ModelEvent> {
+    fn handle_creds_response(user: User, mut model: &mut Model, orders: &mut impl Orders<ModelEvent>) {
         let user_json = serde_json::to_string(&user).unwrap(); // This will never fail.
         let _ = set_session_item("user", &user_json).map_err(|err| {
             log!(format!("{} User info will not be persisted in session storage.", &err));
         });
         model.user = Some(user);
-        Update::with_msg(ModelEvent::Route(Route::Search))
+        orders.send_msg(ModelEvent::Route(Route::Search));
     }
 }
 
 /// The login view.
-pub fn login(model: &Model) -> El<ModelEvent> {
+pub fn login(model: &Model) -> Node<ModelEvent> {
     let is_email_success = model.login.email.len() > 0 && model.login.email_error.is_none();
     let is_pw_success = model.login.pw.len() > 0;
     let button_attrs = match is_email_success && is_pw_success {
         true => attrs!{At::Class => "button is-dark is-outlined"},
         false => attrs!{At::Class => "button is-dark is-outlined"; At::Disabled => true},
     };
-    let spinner: El<ModelEvent> = match model.login.has_network_request {
+    let spinner = match model.login.has_network_request {
         true => span!(class!("icon"), i!(attrs!(At::Class => "fas fa-spinner fa-pulse"))),
         false => seed::empty(),
     };

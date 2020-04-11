@@ -1,14 +1,11 @@
-use std::collections::{
-    BTreeMap, HashMap, HashSet,
-};
+use std::collections::{BTreeMap, HashMap, HashSet};
 
 use common::{
     Error, GiphyGif,
     CategorizeGifRequest, CategorizeGifResponse,
     FetchFavoritesRequest, FetchFavoritesResponse,
 };
-use futures::prelude::*;
-use seed::prelude::*;
+use seed::{*, prelude::*};
 
 use crate::{
     api,
@@ -55,70 +52,78 @@ pub enum FavoritesEvent {
 
 impl FavoritesEvent {
     /// The reducer for this state model.
-    pub fn reducer(event: FavoritesEvent, mut model: &mut Model) -> Update<ModelEvent> {
+    pub fn reducer(event: FavoritesEvent, mut model: &mut Model, orders: &mut impl Orders<ModelEvent>) {
         match event {
             FavoritesEvent::Fetch => match &model.user {
                 Some(user) => {
                     model.favorites.is_fetching_favorites = true;
-                    Update::with_future_msg(api::favorites(FetchFavoritesRequest, user.jwt.clone())
-                        .map(|r| ModelEvent::Favorites(FavoritesEvent::FetchSuccess(r)))
-                        .map_err(|e| ModelEvent::Favorites(FavoritesEvent::FetchError(e))))
+                    let jwt = user.jwt.clone();
+                    orders.perform_cmd(async move {
+                        api::favorites(FetchFavoritesRequest{}, jwt).await
+                            .map(|data| ModelEvent::Favorites(FavoritesEvent::FetchSuccess(data)))
+                            .map_err(|err| ModelEvent::Favorites(FavoritesEvent::FetchError(err)))
+                    });
                 }
-                None => Update::with_msg(ModelEvent::Logout),
+                None => {
+                    orders.send_msg(ModelEvent::Logout);
+                }
             }
             FavoritesEvent::FetchSuccess(res) => {
                 model.favorites.is_fetching_favorites = false;
                 res.gifs.into_iter().for_each(|gif| { model.favorites.favorites.insert(gif.id.clone(), gif); });
-                Render.into()
             }
             FavoritesEvent::FetchError(err) => {
                 model.favorites.is_fetching_favorites = false;
                 model.favorites.fetch_error = Some(err.clone());
-                handle_common_errors(&err).unwrap_or(Render.into())
+                if let Some(event) = handle_common_errors(&err) {
+                    orders.send_msg(event);
+                }
             }
             FavoritesEvent::Categorize(id) => match &model.user {
                 Some(user) => match model.favorites.category_updates.get(&id) {
                     Some(category) => {
                         model.favorites.saving_category.insert(id.clone());
                         let payload = CategorizeGifRequest{id: id.clone(), category: category.to_string()};
-                        Update::with_future_msg(api::categorize(payload, user.jwt.clone())
-                            .map(|r| ModelEvent::Favorites(FavoritesEvent::CategorizeSuccess(r)))
-                            .map_err(|(id, e)| ModelEvent::Favorites(FavoritesEvent::CategorizeError(id, e))))
+                        let jwt = user.jwt.clone();
+                        orders.perform_cmd(async move {
+                            api::categorize(payload, jwt).await
+                                .map(|data| ModelEvent::Favorites(FavoritesEvent::CategorizeSuccess(data)))
+                                .map_err(|(id, e)| ModelEvent::Favorites(FavoritesEvent::CategorizeError(id, e)))
+                        });
                     }
-                    None => Skip.into()
+                    None => {
+                        orders.skip();
+                    }
                 }
-                None => Update::with_msg(ModelEvent::Logout),
+                None => {
+                    orders.send_msg(ModelEvent::Logout);
+                }
             },
             FavoritesEvent::CategorizeSuccess(res) => {
                 let gif = res.gif;
                 model.favorites.saving_category.remove(&gif.id);
                 model.favorites.category_updates.remove(&gif.id);
                 model.favorites.favorites.insert(gif.id.clone(), gif);
-                Render.into()
             }
             FavoritesEvent::CategorizeError(id, err) => {
                 log!(format!("Error while saving category. {:?}", &err));
                 model.favorites.saving_category.remove(&id);
-                Render.into()
             }
             FavoritesEvent::UpdateFilter(filter) => {
                 model.favorites.filter = filter;
-                Render.into()
             }
-            FavoritesEvent::UpdateCategory(id, val) => {
-                match val.len() > 0 {
-                    true => model.favorites.category_updates.insert(id, val),
-                    false => model.favorites.category_updates.remove(&id),
-                };
-                Render.into()
+            FavoritesEvent::UpdateCategory(id, val) => if val.len() > 0 {
+                model.favorites.category_updates.insert(id, val);
+            } else {
+                model.favorites.category_updates.remove(&id);
             }
         }
     }
 }
 
 /// The favorites view.
-pub fn favorites(model: &Model) -> El<ModelEvent> {
-    let spinner: El<ModelEvent> = match model.favorites.is_fetching_favorites {
+pub fn favorites(model: &Model) -> Node<ModelEvent> {
+    let spinner: Node<ModelEvent> = match model.favorites.is_fetching_favorites {
         true => span!(class!("icon ml-1"), i!(attrs!(At::Class => "fas fa-spinner fa-pulse"))),
         false => b!(""),
     };
@@ -140,7 +145,7 @@ pub fn favorites(model: &Model) -> El<ModelEvent> {
                             ),
                             p!(attrs!{At::Class => "control is-expanded"},
                                 input!(
-                                    attrs!(At::Value => model.favorites.filter; At::Class => "input"; At::PlaceHolder => "Filter by category"),
+                                    attrs!(At::Value => model.favorites.filter; At::Class => "input"; At::Placeholder => "Filter by category"),
                                     input_ev(Ev::Input, |val| ModelEvent::Favorites(FavoritesEvent::UpdateFilter(val))),
                                 ),
                             ),

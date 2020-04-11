@@ -3,7 +3,7 @@ giphy api
 A WebAssembly application that allows a user to search for and save animated GIFs to a user profile using the [GIPHY API](https://developers.giphy.com/docs/).
 
 ### overview
-The API is structured as a very simple JSON/RPC API built using [actix.rs](https://actix.rs/). The client & server use the same exact data models for communicating over the network. All interaction is protected by JWT authN/authZ.
+The API is structured as a very simple JSON RPC API built using [actix.rs](https://actix.rs/). The client & server use the same exact data models for communicating over the network. All interaction is protected by JWT authN/authZ.
 
 The client app is a WebAssembly (WASM) application built using Rust.
 
@@ -26,7 +26,7 @@ Now that you have all of the tools in place, let's bring up the DB and build our
 ```bash
 # Boot Postgres. This will also initialize our tables.
 docker run -d --name postgres \
-    -e POSTGRES_PASSWORD=pgpass \
+    -e POSTGRES_PASSWORD=pgpass -p 5432:5432 \
     -v `pwd`/pg.sql:/docker-entrypoint-initdb.d/pg.sql \
     postgres
 # Build the UI.
