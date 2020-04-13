@@ -1,0 +1,9 @@
+[book]
+authors = ["Anthony Dodd"]
+language = "en"
+multilingual = false
+src = "book"
+title = "Learning Rust with Actix, WASM & Giphy"
+
+[build]
+build-dir = "book-static"

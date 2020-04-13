@@ -11,7 +11,7 @@ use crate::router::Route;
 use crate::state::{Model, ModelEvent};
 use crate::utils::set_session_item;
 
-const NBSP: &str = " "; // Is not a space, it is an NBSP;
+const NBSP: &str = " "; // Is not a space, it is a NBSP;
 const EMAIL_ERR: &str = "Must provide a valid email address.";
 const PASSWD_ERR: &str = "Password must be at least 6 characters in length.";
 

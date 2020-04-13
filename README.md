@@ -26,7 +26,7 @@ Now that you have all of the tools in place, let's bring up the DB and build our
 ```bash
 # Boot Postgres. This will also initialize our tables.
 docker run -d --name postgres \
-    -e POSTGRES_PASSWORD=pgpass -p 5432:5432 \
+    -e POSTGRES_PASSWORD=pgpass -p 54321:5432 \
     -v `pwd`/pg.sql:/docker-entrypoint-initdb.d/pg.sql \
     postgres
 # Build the UI.
@@ -42,9 +42,9 @@ Now you're ready to start using the app. Simply navigate to http://localhost:900
 
 ### demo images mobile
 <p>
-    <img height="300px" src=".demo-images/0-login.png"/>
-    <img height="300px" src=".demo-images/1-search.png"/>
-    <img height="300px" src=".demo-images/2-navbar.png"/>
-    <img height="300px" src=".demo-images/3-search-results.png"/>
-    <img height="300px" src=".demo-images/4-favorites-and-categorization.png"/>
+    <img height="300px" src="./book/images/0-login.png"/>
+    <img height="300px" src="./book/images/1-search.png"/>
+    <img height="300px" src="./book/images/2-navbar.png"/>
+    <img height="300px" src="./book/images/3-search-results.png"/>
+    <img height="300px" src="./book/images/4-favorites-and-categorization.png"/>
 </p>

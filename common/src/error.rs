@@ -93,7 +93,7 @@ impl From<sqlx::Error> for Error {
 #[cfg(feature="server")]
 impl ResponseError for Error {
     fn status_code(&self) -> StatusCode {
-        StatusCode::from_u16(self.status).unwrap_or(StatusCode::INTERNAL_SERVER_ERROR)
+        StatusCode::OK // We always return a 200 on the network layer.
     }
     fn error_response(&self) -> HttpResponse<Body> {
         HttpResponse::build(self.status_code())

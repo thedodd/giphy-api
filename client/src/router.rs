@@ -1,4 +1,4 @@
-use seed::*;
+use seed::Url;
 
 use crate::ModelEvent;
 use crate::containers::FavoritesEvent;
@@ -48,23 +48,23 @@ pub fn router(url: Url) -> Option<ModelEvent> {
     match url.path.get(0).map(|val| val.as_str()).unwrap_or("") {
         "ui" => match url.path.get(1) {
             None => {
-                log!("Routing to init page.");
+                seed::log!("Routing to init page.");
                 Some(ModelEvent::Route(Route::Init))
             }
             Some(path) if path == "login" => {
-                log!("Routing to login page.");
+                seed::log!("Routing to login page.");
                 Some(ModelEvent::Route(Route::Login))
             }
             Some(path) if path == "search" => {
-                log!("Routing to search page.");
+                seed::log!("Routing to search page.");
                 Some(ModelEvent::Route(Route::Search))
             }
             Some(path) if path == "favorites" => {
-                log!("Routing to favorites page.");
+                seed::log!("Routing to favorites page.");
                 Some(ModelEvent::Route(Route::Favorites))
             }
             Some(path) => {
-                log!("Unrecognized route '{}', sending to search page.", path);
+                seed::log!("Unrecognized route '{}', sending to search page.", path);
                 Some(ModelEvent::Route(Route::Search))
             }
         }

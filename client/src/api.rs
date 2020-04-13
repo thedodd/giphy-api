@@ -9,7 +9,6 @@ use common::{
 };
 use lazy_static::lazy_static;
 use seed::{Method, Request};
-use seed::fetch::FailReason;
 use serde::{Serialize, de::DeserializeOwned};
 
 const AUTHZ: &str = "authorization";
@@ -79,15 +78,12 @@ pub async fn api_post<T, D>(url: String, req: T, jwt: Option<String>) -> Result<
         .await
         // Flatten fetch util's inner result type.
         .unwrap_or_else(|res| res)
-        // Handle errors related to API interfacing.
+        // Handle errors related to API interfacing. Everything here is treated
+        // as an opaque 500. The server will always return a 200 on the network
+        // layer. The response body embeds detailed error info.
         .map_err(|err| {
-            seed::log!("Error during request to API. {:?}", err);
-            match err {
-                // TODO: update these error conditions.
-                FailReason::RequestError(_, _) => Error::new("", 500, None),
-                FailReason::Status(_, _) => Error::new("", 500, None),
-                FailReason::DataError(_, _) => Error::new("", 500, None),
-            }
+            seed::log!("Error while attempting to communicate with API.\n{:?}", err);
+            Error::new("Internal error.", 500, None)
         })
         // Unpack inner response type.
         .and_then(|res: Response<D>| match res {

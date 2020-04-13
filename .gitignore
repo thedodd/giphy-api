@@ -6,3 +6,5 @@ static/*
 !static/.gitkeep
 !static/index.html
 !static/index.css
+book-static/*
+!book-static/.gitkeep
