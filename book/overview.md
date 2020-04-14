@@ -13,6 +13,5 @@ Check out the repository at [github.com/thedodd/giphy-api](https://github.com/th
 ### Learning Objectives
 First and foremost, let's learn something new about Rust!
 
-1. **Start off by building the app!** We have a working application to study, so let's build it. This will give us some practice with the Rust toolchain.
-2. **Break some stuff in the API.**
-3. **Break some stuff in the UI.**
+1. **Review some nice language features.** Let's just start off with a quick sampling of various language features which I love! There are a few chapters dedicated to these features.
+2. **Build the app!** We have a working application to study, so let's build it. This will give us some practice with the Rust toolchain.

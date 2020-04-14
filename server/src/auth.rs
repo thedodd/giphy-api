@@ -45,7 +45,7 @@ pub struct Claims {
 
 impl Claims {
     /// Generate a new JWT for the user specified by ID.
-    pub fn new_for_user<'a>(private_key: &'a jwt::EncodingKey, sub: i64) -> Result<String, Error> {
+    pub fn new_for_user(private_key: &jwt::EncodingKey, sub: i64) -> Result<String, Error> {
         // Build a new claims body.
         let now = Utc::now();
         let exp_duration = chrono::Duration::seconds(DEFAULT_USER_TOKEN_EXP);
@@ -58,7 +58,7 @@ impl Claims {
     }
 
     /// Extract JWT claims from the given request.
-    pub async fn from_request<'a>(request: &'a HttpRequest, pub_key: &'a jwt::DecodingKey<'static>) -> Result<Self, Error> {
+    pub async fn from_request(request: &HttpRequest, pub_key: &jwt::DecodingKey<'static>) -> Result<Self, Error> {
         // Extract auth val from header.
         let authval = match request.headers().get("authorization") {
             Some(val) => match val.to_str() {
@@ -95,7 +95,7 @@ impl Claims {
     ///
     /// This routine will check the veracity of the token's signature, ensuring the token
     /// has not been tampered with, and that the token is not expired.
-    pub fn from_jwt<'a>(jwt: &'a str, pub_key: &'a jwt::DecodingKey<'static>) -> Result<Self, Error> {
+    pub fn from_jwt(jwt: &str, pub_key: &jwt::DecodingKey<'static>) -> Result<Self, Error> {
         // Decode token & extract claims.
         let claims = match jwt::decode::<Self>(jwt, pub_key, &jwt::Validation::new(jwt::Algorithm::RS512)) {
             Ok(t) => t.claims,

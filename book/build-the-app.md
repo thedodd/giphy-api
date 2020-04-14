@@ -1,15 +1,5 @@
-giphy api
-=========
-A WebAssembly application that allows a user to search for and save animated GIFs to a user profile using the [GIPHY API](https://developers.giphy.com/docs/).
-
-### overview
-The API is structured as a very simple JSON RPC API built using [actix.rs](https://actix.rs/). The client & server use the same exact data models for communicating over the network. All interaction is protected by JWT authN/authZ.
-
-The client app is a WebAssembly (WASM) application built using Rust & the [Seed framework](https://seed-rs.org).
-
-We are using Postgres for data storage & [launchbadge/sqlx](https://github.com/launchbadge/sqlx) for the interface.
-
-#### setup
+Build the App
+=============
 First, you'll need Rust. Head on over to [rustup.rs](https://rustup.rs/) and follow the instructions there to setup the Rust toolchain. After that, let's also add the needed compiler target for the WASM instruction set:
 
 ```bash
@@ -38,14 +28,3 @@ cargo run -p server --release
 ```
 
 Now you're ready to start using the app. Simply navigate to [localhost:9000](http://localhost:9000) to get started.
-
-----
-
-### demo images mobile
-<p>
-    <img height="300px" src="./book/images/0-login.png"/>
-    <img height="300px" src="./book/images/1-search.png"/>
-    <img height="300px" src="./book/images/2-navbar.png"/>
-    <img height="300px" src="./book/images/3-search-results.png"/>
-    <img height="300px" src="./book/images/4-favorites-and-categorization.png"/>
-</p>

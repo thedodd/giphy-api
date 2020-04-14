@@ -12,7 +12,7 @@ pub use crate::error::Error;
 // Common Components /////////////////////////////////////////////////////////////////////////////
 
 /// An API response.
-#[derive(Debug, Deserialize, Serialize, Clone)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(tag="result", content="payload")]
 pub enum Response<D> {
     /// A success payload with data.
@@ -24,7 +24,7 @@ pub enum Response<D> {
 }
 
 /// A GIF from the Giphy API.
-#[derive(Debug, Deserialize, Serialize, Clone)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct GiphyGif {
     /// The ID of the GIF in Giphy.
     pub id: String,
@@ -41,7 +41,7 @@ pub struct GiphyGif {
 }
 
 /// A user of the system.
-#[derive(Debug, Deserialize, Serialize, Clone)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct User {
     pub id: i64,
     pub email: String,
@@ -64,62 +64,62 @@ pub struct RegisterRequest {
 }
 
 /// The response to a register request.
-#[derive(Debug, Deserialize, Serialize, Clone)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(transparent)]
 pub struct RegisterResponse(pub User);
 
 /// A login request.
-#[derive(Debug, Deserialize, Serialize, Clone)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct LoginRequest {
     pub email: String,
     pub password: String,
 }
 
 /// The response to a login request.
-#[derive(Debug, Deserialize, Serialize, Clone)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(transparent)]
 pub struct LoginResponse(pub User);
 
 /// A request to search the Giphy API.
-#[derive(Debug, Deserialize, Serialize, Clone)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct SearchGiphyRequest {
     /// The search string to be used for querying Giphy.
     pub query: String,
 }
 
 /// The response to a Giphy search request.
-#[derive(Debug, Deserialize, Serialize, Clone)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct SearchGiphyResponse {
     /// The GIFs returned from the search.
     pub gifs: Vec<GiphyGif>,
 }
 
 /// A reqeust to save a GIF.
-#[derive(Debug, Deserialize, Serialize, Clone)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct SaveGifRequest {
     // The ID of the Giphy GIF to save.
     pub id: String,
 }
 
 /// The response to a request to save a GIF.
-#[derive(Debug, Deserialize, Serialize, Clone)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct SaveGifResponse {
     /// The saved GIF.
     pub gif: GiphyGif,
 }
 
 /// A request to fetch the caller's saved GIFs.
-#[derive(Debug, Deserialize, Serialize, Clone)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct FetchFavoritesRequest {}
 
 /// The response to a request to fetch the caller's saved GIFs.
-#[derive(Debug, Deserialize, Serialize, Clone)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct FetchFavoritesResponse {
     pub gifs: Vec<GiphyGif>,
 }
 
 /// A request to categorize a GIF.
-#[derive(Debug, Deserialize, Serialize, Clone)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct CategorizeGifRequest {
     /// The ID of the GIF to update.
     pub id: String,
@@ -128,7 +128,7 @@ pub struct CategorizeGifRequest {
 }
 
 /// The response to a request to categorize a GIF.
-#[derive(Debug, Deserialize, Serialize, Clone)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct CategorizeGifResponse {
     pub gif: GiphyGif,
 }
