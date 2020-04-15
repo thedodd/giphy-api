@@ -29,6 +29,15 @@ That `claims.must_not_be_expired()` call returns a `Result`. If an error comes u
 What's more? Rust performs automatic type coercion with the `?` operator. What does this mean?
 
 ```rust
+// The std From trait.
+trait From<T> {
+    fn from(T) -> Self;
+}
+```
+
+How is this used?
+
+```rust
 // Let's say `must_not_be_expired()` returns a different error type:
 fn must_not_be_expired(&self) -> Result<(), ExpirationError> {/*...*/}
 
@@ -56,4 +65,20 @@ match my_result {
 }
 ```
 
-The Rust standard syntax prelude includes the discriminants of the Result type for direct use, as seen above. As long as you are using a type which is based on `std::result::Result`, you can directly use `Ok(..)` & `Err(..)` in your code.
+Lots of methods are available on the `Result` type as well.
+
+```rust
+Result::Ok(0)
+    .map(|val| val + 1)
+    // Let's change the error type if one is encountered.
+    .map_err(|_err| "something bad happened!")
+    .and_then(|val| {
+        if val > 0 {
+            Ok(val)
+        } else {
+            Err("not good!!!")
+        }
+    })
+```
+
+The Rust standard syntax prelude includes the discriminants of the Result type for direct use, as seen above. So you can directly use `Ok(..)` & `Err(..)` in your code as a shorthand. Rust will infer the appropriate types based on function signatures and the like.

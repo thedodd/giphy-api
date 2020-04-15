@@ -1,4 +1,3 @@
-use base64;
 use envy;
 use jsonwebtoken::{DecodingKey, EncodingKey};
 use serde::Deserialize;
@@ -6,6 +5,7 @@ use serde::Deserialize;
 /// A model used for deserializing raw values out of the environment.
 #[derive(Deserialize)]
 struct EnvConfig {
+    pub rust_log: String,
     pub port: u16,
     pub database_url: String,
     pub idp_private_key: String,
@@ -25,8 +25,6 @@ pub struct Config {
 impl Config {
     /// Create a new config instance populated from the runtime environment.
     pub fn new() -> Config {
-        // Load env vars from .env if available.
-        dotenv::dotenv().ok();
         // Deserialize config from environment.
         let config = match envy::from_env::<EnvConfig>() {
             Ok(config) => config,

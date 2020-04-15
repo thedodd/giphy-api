@@ -21,11 +21,11 @@ impl Worker for ThreadedWorker {
 Trait inheritence is also supported. `trait Worker: Awesome + Cool + Nifty {..}` requires that any implementor of the `Worker` trait must also implement `Awesome`, `Cool`, and `Nifty`.
 
 ### Generics
-The enums we've studied so far (Option & Result) are both generic types. Here is a generic data type of our own which we use in this app.
+The enums we've studied so far (Option & Result) are both generic types. Here is a generic type of our own which we use in this app.
 
 ```rust
 /// An API response.
-pub enum Response<D> {
+enum Response<D> {
     /// A success payload with data.
     Data(D),
     /// An error payload with an error.
@@ -57,7 +57,7 @@ There are a few kinds in Rust, here is one you will use ALL THE TIME.
 /// An API response.
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(tag="result", content="payload")]
-pub enum Response<D> {
+enum Response<D> {
     /// A success payload with data.
     #[serde(rename="data")]
     Data(D),

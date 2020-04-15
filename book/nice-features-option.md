@@ -13,7 +13,7 @@ An example of how we are using an `Option` type in our app code.
 
 ```rust
 /// A GIF from the Giphy API which has been saved by a user.
-pub struct SavedGif {
+struct SavedGif {
     /// Object ID.
     pub id: i64,
     /// The ID of the user which has saved this GIF.
@@ -61,7 +61,7 @@ What about our own custom enum types? Here is one that we use heavily in the app
 
 ```rust
 /// An API response.
-pub enum Response<D> {
+enum Response<D> {
     /// A success payload with data.
     Data(D),
     /// An error payload with an error.

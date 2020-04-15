@@ -24,6 +24,7 @@ cargo build -p client --release --target wasm32-unknown-unknown
 # Run wasm-bindgen on our output WASM.
 wasm-bindgen target/wasm32-unknown-unknown/release/client.wasm --no-modules --out-dir ./static
 # Now, we run our API which will also serve our WASM bundle, HTML and other assets.
+source .env # Needed env vars.
 cargo run -p server --release
 ```
 
