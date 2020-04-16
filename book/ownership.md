@@ -1,10 +1,8 @@
 Bonus: Ownership, Borrowing & Lifetimes
 =======================================
 
-### Stack vs Heap
-
 ### Data Ownership
-Data is always owned. References are a way to lease out access to the owned data, and lifetimes help you to keep track of this info.
+Data is always owned. References are a way to lease out access to the owned data, and lifetimes help you (and the compiler) to keep track of this lease.
 
 ```rust
 /// The application state object.
@@ -16,7 +14,7 @@ pub struct State {
 }
 ```
 
-Let's have a look at our API code and how we lease out access to our config data.
+Let's have a look at our API code and how we lease out access to our config data (see `server/src/api.rs`).
 
 ### Embedding a Lifetime
 Remember that with references, you are dealing with data that is owned by something else.
@@ -28,7 +26,7 @@ struct DBInfo<'a> {
 }
 
 fn build_info<'a>(name: &'a str, db: &mut PgConn) -> DBInfo<'a> {
-    // do some work, get some info.
+    // Do some work, get some info.
     let tables = get_table_count(db);
     DBInfo{name, tables}
 }
@@ -41,6 +39,8 @@ fn main() {
 
     // Report our info.
     metrics.report_info(info); // <-- the lifetime 'a is still alive here.
+
+    // ... do more cool stuff.
 }
 ```
 
@@ -50,4 +50,4 @@ Why is this significant?
 - For as long as `'a` is alive and well, that reference to `my_db_name` stands. Can not be mutated. Can not be destroyed.
 - No garbage collector needed.
 
-Remember, lifetime rules apply to `&` references. Not to the various pointer types in Rust (Box, Rc, Arc etc).
+Remember, lifetime rules apply to `&` references. Not to the various pointer types in Rust (Box, Rc, Arc etc), though you could still pass around references to them if needed.

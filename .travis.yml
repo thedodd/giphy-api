@@ -1,0 +1,21 @@
+language: rust
+rust:
+  - stable
+
+matrix:
+  fast_finish: true
+
+script:
+  - wget -qO - https://github.com/rust-lang/mdBook/releases/download/v0.3.7/mdbook-v0.3.7-x86_64-unknown-linux-gnu.tar.gz | tar -xzf -
+  - sudo mv mdbook /bin/mdbook
+  - mdbook build
+
+deploy:
+  provider: pages
+  skip_cleanup: true
+  github_token: $GH_PAGES_TOKEN
+  keep_history: false
+  local_dir: book-static
+  target_branch: gh-pages
+  on:
+    branch: master

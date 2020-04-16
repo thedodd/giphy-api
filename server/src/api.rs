@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use actix_files as fs;
 use actix_web::{App, HttpServer};
+use actix_web::dev::Server;
 use actix_web::web::{self, Data, HttpRequest};
 use actix_web::Result;
 use bytes::Bytes;
@@ -35,7 +36,7 @@ pub struct State {
     pub config: Arc<Config>,
 }
 
-pub fn new(db: PgPool, client: Client, config: Arc<Config>) -> Result<actix_web::dev::Server> {
+pub fn new(db: PgPool, client: Client, config: Arc<Config>) -> Result<Server> {
     let state = State{db, client, config: config.clone()};
     Ok(HttpServer::new(move || {
         App::new()
