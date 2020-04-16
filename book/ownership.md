@@ -51,3 +51,10 @@ Why is this significant?
 - No garbage collector needed.
 
 Remember, lifetime rules apply to `&` references. Not to the various pointer types in Rust (Box, Rc, Arc etc), though you could still pass around references to them if needed.
+
+### Mutability & Exclusive References
+In Rust, we have references `&` (shared) and we have mutable references `&mut` (exclusive).
+
+This, combined with Rust's lifetime system, ensures that we don't have pointers retained in random parts of our app which might be making subtle changes to values behind the scenes.
+
+Let's look at `client/src/state.rs` for some examples on handling mutability.
